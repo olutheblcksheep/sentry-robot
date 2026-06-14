@@ -474,6 +474,9 @@
 
         // Fallback WebSocket JPEG streaming
         socket.on("video_frame", (data) => {
+	    feedPlaceholder.style.display = "none";
+	    fallbackImg.style.display = "block";
+
             // If WebRTC is active, skip JPEG frames to conserve performance
             if (peerConnection && peerConnection.connectionState === "connected") {
                 return;
