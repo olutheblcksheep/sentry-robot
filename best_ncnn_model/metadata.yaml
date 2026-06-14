@@ -1,0 +1,30 @@
+description: Ultralytics YOLO11n model trained on /kaggle/working/dataset/data.yaml
+author: Ultralytics
+date: '2026-06-09T15:20:06.286123'
+version: 8.4.62
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+batch: 1
+imgsz:
+- 640
+- 640
+names:
+  0: Axe
+  1: Chainsaw
+  2: Chisel
+  3: Coin
+  4: Drink
+  5: Dumbbell
+  6: Fork
+  7: Hammer
+  8: Knife
+  9: Scissors
+  10: Screwdriver
+  11: Stapler
+args:
+  batch: 1
+  half: false
+channels: 3
+end2end: false

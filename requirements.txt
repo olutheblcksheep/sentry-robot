@@ -1,0 +1,14 @@
+# SENTRY Core Robot Dependencies
+flask
+flask-socketio
+pyserial
+opencv-python
+
+# SENTRY Cloud Agent Integration
+python-socketio[client]
+websocket-client
+
+# Optional low-latency WebRTC dependencies (uncomment to compile and install on Pi)
+# Note: Requires system libraries (libavformat-dev, libavdevice-dev, libavfilter-dev, libopus-dev, libvpx-dev, pkg-config)
+# aiortc
+# av

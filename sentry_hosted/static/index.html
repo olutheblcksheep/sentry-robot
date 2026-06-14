@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentry — LiDAR Navigation Dashboard</title>
+    <meta name="description" content="Live 2D LiDAR room mapping and navigation command interface for the Sentry robot.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <!-- ─── TOP BAR ─────────────────────────────────────────────── -->
+    <header id="topbar">
+        <div class="topbar-left">
+            <div class="logo-mark">◉</div>
+            <h1>SENTRY</h1>
+            <span class="badge" id="mode-badge">CONNECTING</span>
+            <a href="/camera" class="nav-link" title="Open the camera dashboard">◀ CAMERA</a>
+        </div>
+        <div class="topbar-right">
+            <div class="stat-pill">
+                <span class="stat-label">SCAN PTS</span>
+                <span class="stat-value" id="stat-points">—</span>
+            </div>
+            <div class="stat-pill">
+                <span class="stat-label">REFRESH</span>
+                <span class="stat-value" id="stat-fps">—</span>
+            </div>
+            <div class="status-dot" id="status-dot"></div>
+        </div>
+    </header>
+
+    <!-- ─── MAIN LAYOUT ────────────────────────────────────────── -->
+    <main id="app">
+
+        <!-- ─── RADAR DISPLAY ───────────────────────────────────── -->
+        <section id="radar-section">
+            <div id="radar-container">
+                <canvas id="radar-canvas"></canvas>
+                <div id="radar-crosshair-h"></div>
+                <div id="radar-crosshair-v"></div>
+                <div id="robot-icon">⬤</div>
+                <!-- Distance ring labels are injected by JS -->
+            </div>
+            <div id="radar-footer">
+                <span>Click anywhere on the map to set a navigation target</span>
+                <div class="zoom-controls">
+                    <button id="zoom-in" title="Zoom in">＋</button>
+                    <button id="zoom-out" title="Zoom out">－</button>
+                    <span id="zoom-label">Range: 4.0 m</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── SIDE PANEL ──────────────────────────────────────── -->
+        <aside id="side-panel">
+
+            <!-- Navigation target card -->
+            <div class="card" id="nav-card">
+                <h2>Navigation Target</h2>
+                <div class="target-display" id="target-display">
+                    <span class="target-placeholder">Click the map to set a target</span>
+                </div>
+
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="input-x">X (mm)</label>
+                        <input type="number" id="input-x" placeholder="0" step="50">
+                    </div>
+                    <div class="input-group">
+                        <label for="input-y">Y (mm)</label>
+                        <input type="number" id="input-y" placeholder="0" step="50">
+                    </div>
+                </div>
+
+                <div class="input-row">
+                    <div class="input-group full-width">
+                        <label for="input-speed">Speed (%)</label>
+                        <div class="speed-row">
+                            <input type="range" id="input-speed" min="10" max="100" value="60">
+                            <span id="speed-label">60%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="btn-navigate" class="btn-primary" disabled>
+                    <span class="btn-icon">▶</span> Send Command
+                </button>
+                <button id="btn-clear" class="btn-secondary">
+                    <span class="btn-icon">✕</span> Clear Target
+                </button>
+            </div>
+
+            <!-- Serial command preview card -->
+            <div class="card" id="serial-card">
+                <h2>Serial Command Preview</h2>
+                <div id="serial-preview">
+                    <p class="serial-hint">Set a target to see the serial commands.</p>
+                </div>
+            </div>
+
+            <!-- Mouse position readout -->
+            <div class="card mini-card" id="cursor-card">
+                <h2>Cursor</h2>
+                <div class="readout-grid">
+                    <span class="readout-label">X</span>
+                    <span class="readout-value" id="cursor-x">— mm</span>
+                    <span class="readout-label">Y</span>
+                    <span class="readout-value" id="cursor-y">— mm</span>
+                    <span class="readout-label">Dist</span>
+                    <span class="readout-value" id="cursor-dist">— mm</span>
+                    <span class="readout-label">Angle</span>
+                    <span class="readout-value" id="cursor-angle">—°</span>
+                </div>
+            </div>
+
+        </aside>
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTRY — Robot Command Interface</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --green:      #00ff88;
+  --green-dim:  #00cc66;
+  --green-dark: #003322;
+  --amber:      #ffaa00;
+  --red:        #ff3333;
+  --bg:         #020a04;
+  --panel:      #050f07;
+  --border:     #0a2e14;
+  --border-lit: #00ff8844;
+  --text:       #00cc66;
+  --text-dim:   #006633;
+}
+html, body { height: 100%; background: var(--bg); color: var(--text);
+  font-family: 'Share Tech Mono', monospace; font-size: 13px;
+  overflow: hidden; cursor: crosshair; }
+body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index:1000;
+  background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.15) 2px,rgba(0,0,0,0.15) 4px); }
+body::after  { content:''; position:fixed; inset:0; pointer-events:none; z-index:999;
+  background: radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,0.7) 100%); }
+
+/* Layout */
+.shell {
+  display: grid;
+  grid-template-rows: 48px 1fr 120px;
+  grid-template-columns: 1fr 280px;
+  grid-template-areas: "header header" "feed sidebar" "controls controls";
+  height: 100vh; gap: 1px; background: var(--border); padding: 1px;
+}
+
+/* Header */
+header { grid-area:header; background:var(--panel); display:flex;
+  align-items:center; justify-content:space-between; padding:0 20px;
+  border-bottom:1px solid var(--border-lit); position:relative; overflow:hidden; }
+header::before { content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg,var(--green-dark) 0%,transparent 40%,transparent 60%,var(--green-dark) 100%); }
+.logo { font-family:'Orbitron',sans-serif; font-weight:900; font-size:22px;
+  letter-spacing:8px; color:var(--green); text-shadow:0 0 20px var(--green),0 0 40px var(--green-dim); position:relative; }
+.logo span { color:var(--text-dim); }
+.header-meta { display:flex; gap:32px; align-items:center; position:relative; }
+.meta-item { display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
+.meta-label { font-size:9px; letter-spacing:3px; color:var(--text-dim); text-transform:uppercase; }
+.meta-value { font-size:13px; color:var(--green); }
+.rec-dot { width:8px; height:8px; border-radius:50%; background:var(--red);
+  box-shadow:0 0 8px var(--red); animation:pulse-red 1.2s ease-in-out infinite; display:inline-block; margin-right:6px; }
+@keyframes pulse-red { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+/* Feed */
+.feed-area { grid-area:feed; background:#000; position:relative; overflow:hidden; }
+#camera-feed { width:100%; height:100%; object-fit:cover; display:block; }
+#det-canvas  { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:10; }
+.feed-area::before,.feed-area::after,.corner-br,.corner-bl { content:''; position:absolute;
+  width:28px; height:28px; border-color:var(--green); border-style:solid; z-index:11; }
+.feed-area::before { top:10px; left:10px;  border-width:2px 0 0 2px; }
+.feed-area::after  { top:10px; right:10px; border-width:2px 2px 0 0; }
+.corner-br { bottom:10px; right:10px; border-width:0 2px 2px 0; }
+.corner-bl { bottom:10px; left:10px;  border-width:0 0 2px 2px; }
+.scan-line { position:absolute; left:0; right:0; height:2px; pointer-events:none; z-index:10;
+  background:linear-gradient(90deg,transparent,var(--green) 50%,transparent);
+  opacity:0.4; animation:scan 4s linear infinite; }
+@keyframes scan { 0%{top:-2px} 100%{top:100%} }
+.feed-hud { position:absolute; inset:0; z-index:11; pointer-events:none;
+  display:flex; flex-direction:column; justify-content:space-between; padding:14px 16px; }
+.hud-top,.hud-bottom { display:flex; justify-content:space-between; align-items:flex-start; }
+.hud-bottom { align-items:flex-end; }
+.hud-tag { font-size:10px; letter-spacing:2px; color:var(--green-dim); opacity:0.7; }
+.hud-timestamp { font-size:11px; color:var(--green); text-shadow:0 0 8px var(--green); }
+.feed-offline { position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:16px; color:var(--text-dim);
+  font-size:12px; letter-spacing:3px; text-transform:uppercase; background:#000; }
+.feed-offline .big-text { font-family:'Orbitron',sans-serif; font-size:11px; letter-spacing:6px; }
+#threat-flash { position:fixed; inset:0; background:rgba(255,0,0,0.12);
+  pointer-events:none; z-index:998; opacity:0; transition:opacity 0.1s; }
+#threat-flash.active { animation:threat-pulse 0.8s ease-out; }
+@keyframes threat-pulse { 0%{opacity:1} 100%{opacity:0} }
+
+/* Sidebar */
+.sidebar { grid-area:sidebar; background:var(--panel); display:flex;
+  flex-direction:column; gap:1px; overflow:hidden; }
+.panel { background:var(--panel); border:1px solid var(--border); padding:12px; position:relative; }
+.panel-title { font-family:'Orbitron',sans-serif; font-size:9px; letter-spacing:4px;
+  color:var(--text-dim); text-transform:uppercase; margin-bottom:10px;
+  display:flex; align-items:center; gap:8px; }
+.panel-title::before { content:''; display:block; width:4px; height:4px;
+  background:var(--green); box-shadow:0 0 6px var(--green); flex-shrink:0; }
+
+/* Battery */
+.battery-panel { flex-shrink:0; }
+.battery-display { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+.battery-icon { display:flex; align-items:center; gap:2px; }
+.battery-body { width:42px; height:20px; border:2px solid var(--green); border-radius:2px;
+  padding:2px; display:flex; align-items:center; }
+.battery-tip { width:4px; height:10px; background:var(--green); border-radius:0 2px 2px 0; margin-left:1px; }
+.battery-fill { height:100%; border-radius:1px; background:var(--green); transition:width 1s,background 0.5s; }
+.battery-pct { font-family:'Orbitron',sans-serif; font-size:28px; font-weight:700;
+  color:var(--green); text-shadow:0 0 16px var(--green); line-height:1; }
+.battery-pct.warn { color:var(--amber); text-shadow:0 0 16px var(--amber); }
+.battery-pct.crit { color:var(--red);   text-shadow:0 0 16px var(--red); animation:pulse-red 1s infinite; }
+.battery-bar { width:100%; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+.battery-bar-fill { height:100%; border-radius:2px; background:var(--green); transition:width 1s,background 0.5s; }
+
+/* Toggles */
+.toggle-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+.toggle-label { color:var(--text); font-size:11px; letter-spacing:1px; }
+.toggle { position:relative; width:48px; height:24px; }
+.toggle input { opacity:0; width:0; height:0; }
+.toggle-track { position:absolute; inset:0; background:var(--green-dark);
+  border:1px solid var(--text-dim); border-radius:12px; cursor:pointer; transition:0.3s; }
+.toggle-track::after { content:''; position:absolute; top:3px; left:3px; width:16px; height:16px;
+  background:var(--text-dim); border-radius:50%; transition:0.3s; }
+.toggle input:checked + .toggle-track { border-color:var(--green); box-shadow:0 0 10px var(--green-dim); }
+.toggle input:checked + .toggle-track::after { transform:translateX(24px); background:var(--green); }
+.det-status { font-size:10px; letter-spacing:2px; color:var(--text-dim); margin-top:4px; }
+.det-status.active { color:var(--green); text-shadow:0 0 6px var(--green); animation:blink 2s step-end infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+/* LiDAR radar */
+.lidar-panel { flex-shrink:0; }
+#lidar-canvas { display:block; margin:0 auto; border-radius:50%;
+  border:1px solid var(--border-lit); background:#000; }
+.lidar-stats { display:flex; justify-content:space-between; margin-top:6px;
+  font-size:9px; letter-spacing:1px; color:var(--text-dim); }
+.obstacle-warn { color:var(--red); text-shadow:0 0 6px var(--red);
+  animation:blink 0.5s step-end infinite; display:none; }
+
+/* Connection status */
+.conn-status { display:flex; flex-direction:column; gap:6px; font-size:10px; letter-spacing:1px; }
+.conn-item { display:flex; align-items:center; gap:8px; color:var(--text-dim); }
+.conn-dot { width:6px; height:6px; border-radius:50%; background:var(--text-dim); flex-shrink:0; }
+.conn-dot.online { background:var(--green); box-shadow:0 0 6px var(--green); animation:pulse-green 2s infinite; }
+.conn-dot.offline { background:var(--red); box-shadow:0 0 6px var(--red); }
+@keyframes pulse-green { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+/* Alerts */
+.alerts-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; min-height:0; }
+.alerts-log { flex:1; overflow-y:auto; display:flex; flex-direction:column-reverse;
+  gap:4px; scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
+.alert-item { padding:6px 8px; border-left:3px solid var(--text-dim);
+  background:rgba(0,255,136,0.02); animation:slide-in 0.3s ease-out; }
+.alert-item.threat { border-left-color:var(--red); background:rgba(255,51,51,0.06); }
+.alert-item.detection { border-left-color:var(--amber); background:rgba(255,170,0,0.04); }
+.alert-item.obstacle { border-left-color:#ff6600; background:rgba(255,102,0,0.06); }
+@keyframes slide-in { from{transform:translateX(20px);opacity:0} to{transform:none;opacity:1} }
+.alert-time { font-size:9px; color:var(--text-dim); letter-spacing:1px; }
+.alert-msg { font-size:11px; color:var(--text); margin-top:2px; line-height:1.4; }
+.alert-item.threat .alert-msg { color:var(--red); }
+.alert-item.detection .alert-msg { color:var(--amber); }
+.alert-item.obstacle .alert-msg { color:#ff6600; }
+
+/* Controls */
+.controls-area { grid-area:controls; background:var(--panel);
+  border-top:1px solid var(--border-lit); display:flex;
+  align-items:center; justify-content:center; gap:40px; padding:12px 24px; }
+.dpad { display:grid; grid-template-columns:repeat(3,40px); grid-template-rows:repeat(3,40px); gap:4px; }
+.btn { background:var(--green-dark); border:1px solid var(--border-lit); color:var(--green);
+  font-family:'Share Tech Mono',monospace; font-size:18px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:3px; transition:background 0.1s,box-shadow 0.1s,transform 0.1s;
+  user-select:none; -webkit-user-select:none; touch-action:none; }
+.btn:hover { background:#00331a; border-color:var(--green); box-shadow:0 0 12px var(--green-dim); }
+.btn:active,.btn.pressed { background:#004422; box-shadow:0 0 20px var(--green); transform:scale(0.93); }
+.btn-stop { background:rgba(255,51,51,0.1); border-color:rgba(255,51,51,0.4); color:var(--red);
+  font-size:10px; letter-spacing:2px; font-family:'Orbitron',sans-serif; font-weight:700; }
+.btn-stop:hover { background:rgba(255,51,51,0.2); border-color:var(--red); box-shadow:0 0 16px rgba(255,51,51,0.5); }
+.speed-control { display:flex; flex-direction:column; align-items:center; gap:8px; }
+.speed-label { font-family:'Orbitron',sans-serif; font-size:9px; letter-spacing:3px; color:var(--text-dim); }
+.speed-value { font-family:'Orbitron',sans-serif; font-size:24px; font-weight:700;
+  color:var(--green); text-shadow:0 0 12px var(--green); }
+input[type=range] { -webkit-appearance:none; width:120px; height:4px;
+  background:var(--border); border-radius:2px; outline:none; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px;
+  background:var(--green); border-radius:50%; box-shadow:0 0 8px var(--green); cursor:pointer; }
+.key-hints { display:flex; flex-direction:column; gap:4px; font-size:10px;
+  color:var(--text-dim); letter-spacing:1px; }
+.key-hint { display:flex; align-items:center; gap:6px; }
+.key { display:inline-flex; align-items:center; justify-content:center;
+  width:20px; height:20px; border:1px solid var(--text-dim); border-radius:3px;
+  font-size:10px; color:var(--text-dim); }
+.nav-link { font-family:'Orbitron',sans-serif; font-size:11px; letter-spacing:3px;
+  text-decoration:none; color:var(--green); border:1px solid var(--border-lit);
+  border-radius:3px; padding:6px 12px; transition:background 0.15s,box-shadow 0.15s;
+  background:var(--green-dark); position:relative; }
+.nav-link:hover { background:#00331a; border-color:var(--green); box-shadow:0 0 12px var(--green-dim); }
+</style>
+</head>
+<body>
+<div id="threat-flash"></div>
+<div class="shell">
+
+<!-- Header -->
+<header>
+  <div class="logo">SENTRY <span>// UNIT-01</span></div>
+  <div class="header-meta">
+    <a href="/map" class="nav-link" title="Open the LiDAR map dashboard">◎ LiDAR MAP</a>
+    <div class="meta-item">
+      <span class="meta-label">Mode</span>
+      <span class="meta-value"><span class="rec-dot"></span>LIVE</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">UTC</span>
+      <span class="meta-value" id="clock">--:--:--</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Uplink</span>
+      <span class="meta-value" id="ping-display">-- ms</span>
+    </div>
+  </div>
+</header>
+
+<!-- Camera Feed -->
+<div class="feed-area">
+  <div class="corner-br"></div>
+  <div class="corner-bl"></div>
+  <div class="scan-line"></div>
+  <div class="feed-offline" id="feed-offline">
+    <div class="big-text">⬡ SIGNAL LOST</div>
+    <div>AWAITING STREAM</div>
+  </div>
+  <img id="camera-feed" src="/video_feed" alt="Camera Feed" style="display:none"
+       onload="document.getElementById('feed-offline').style.display='none';this.style.display='block';setDot('dot-camera',true);"
+       onerror="document.getElementById('feed-offline').style.display='flex';this.style.display='none';">
+  <canvas id="det-canvas"></canvas>
+  <div class="feed-hud">
+    <div class="hud-top">
+      <span class="hud-tag">CAM-01 // 320×240</span>
+      <span class="hud-timestamp" id="feed-timestamp">--</span>
+    </div>
+    <div class="hud-bottom">
+      <span class="hud-tag" id="det-count">OBJECTS: 0</span>
+      <span class="hud-tag" id="threat-count" style="color:var(--red)">THREATS: 0</span>
+    </div>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<div class="sidebar">
+
+  <!-- Battery -->
+  <div class="panel battery-panel">
+    <div class="panel-title">Power Status</div>
+    <div class="battery-display">
+      <div class="battery-icon">
+        <div class="battery-body"><div class="battery-fill" id="bat-icon-fill" style="width:87%"></div></div>
+        <div class="battery-tip"></div>
+      </div>
+      <div class="battery-pct" id="bat-pct">87%</div>
+    </div>
+    <div class="battery-bar"><div class="battery-bar-fill" id="bat-bar" style="width:87%"></div></div>
+  </div>
+
+  <!-- Detection + Auto -->
+  <div class="panel" style="flex-shrink:0">
+    <div class="panel-title">AI Detection</div>
+    <div class="toggle-row">
+      <span class="toggle-label">AI SCAN</span>
+      <label class="toggle">
+        <input type="checkbox" id="detection-toggle" onchange="toggleDetection(this.checked)">
+        <div class="toggle-track"></div>
+      </label>
+    </div>
+    <div class="det-status" id="det-status">STANDBY</div>
+    <div style="margin-top:8px">
+      <div class="toggle-row">
+        <span class="toggle-label">AUTO NAV</span>
+        <label class="toggle">
+          <input type="checkbox" id="auto-toggle" onchange="toggleAuto(this.checked)">
+          <div class="toggle-track"></div>
+        </label>
+      </div>
+      <div class="det-status" id="auto-status">MANUAL</div>
+    </div>
+  </div>
+
+  <!-- LiDAR Radar -->
+  <div class="panel lidar-panel" style="flex-shrink:0">
+    <div class="panel-title">LiDAR Radar</div>
+    <canvas id="lidar-canvas" width="220" height="120"></canvas>
+    <div class="lidar-stats">
+      <span id="lidar-points">-- pts</span>
+      <span class="obstacle-warn" id="obstacle-warn">⚠ OBSTACLE</span>
+      <span id="lidar-range">12m range</span>
+    </div>
+  </div>
+
+  <!-- System Links -->
+  <div class="panel" style="flex-shrink:0">
+    <div class="panel-title">System Links</div>
+    <div class="conn-status">
+      <div class="conn-item"><div class="conn-dot" id="dot-socket"></div><span>WEBSOCKET</span></div>
+      <div class="conn-item"><div class="conn-dot" id="dot-serial"></div><span>ESP32 SERIAL</span></div>
+      <div class="conn-item"><div class="conn-dot" id="dot-camera"></div><span>CAMERA FEED</span></div>
+      <div class="conn-item"><div class="conn-dot" id="dot-lidar"></div><span>D500 LIDAR</span></div>
+    </div>
+  </div>
+
+  <!-- Event Log -->
+  <div class="panel alerts-panel">
+    <div class="panel-title">Event Log</div>
+    <div class="alerts-log" id="alerts-log">
+      <div class="alert-item">
+        <div class="alert-time">-- SYSTEM INIT --</div>
+        <div class="alert-msg">Awaiting connection...</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- sidebar -->
+
+<!-- Controls -->
+<div class="controls-area">
+  <div class="dpad">
+    <div></div>
+    <button class="btn" id="btn-forward"  data-cmd="forward"  title="W">▲</button>
+    <div></div>
+    <button class="btn" id="btn-left"     data-cmd="left"     title="A">◀</button>
+    <button class="btn btn-stop"           data-cmd="stop"     title="Space">STOP</button>
+    <button class="btn" id="btn-right"    data-cmd="right"    title="D">▶</button>
+    <div></div>
+    <button class="btn" id="btn-backward" data-cmd="backward" title="S">▼</button>
+    <div></div>
+  </div>
+  <div class="speed-control">
+    <div class="speed-label">Speed</div>
+    <div class="speed-value" id="speed-display">80%</div>
+    <input type="range" id="speed-slider" min="10" max="100" value="80" oninput="updateSpeed(this.value)">
+  </div>
+  <div class="key-hints">
+    <div class="key-hint"><span class="key">W</span> Forward</div>
+    <div class="key-hint"><span class="key">S</span> Backward</div>
+    <div class="key-hint"><span class="key">A</span> Left</div>
+    <div class="key-hint"><span class="key">D</span> Right</div>
+    <div class="key-hint"><span class="key">␣</span> Stop</div>
+  </div>
+  <div class="conn-status">
+    <div class="conn-item"><div class="conn-dot online"></div><span id="ip-display">SENTRY:5000</span></div>
+  </div>
+</div>
+
+</div><!-- shell -->
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let speed = 80, detActive = false, autoActive = false;
+let socketOnline = false, totalDets = 0, totalThreats = 0;
+let holdTimer = null, pingStart = 0;
+let lidarActive = false;
+
+// ── Socket.IO ─────────────────────────────────────────────────────────────────
+const socket = io({ transports: ["websocket"] });
+
+socket.on("connect", () => {
+  socketOnline = true;
+  setDot("dot-socket", true);
+  addLog("sys", "WebSocket connected");
+  pingStart = Date.now();
+  socket.emit("ping_req");
+});
+
+socket.on("disconnect", () => {
+  socketOnline = false;
+  setDot("dot-socket", false);
+  addLog("sys", "WebSocket disconnected");
+});
+
+socket.on("pong_res", () => {
+  document.getElementById("ping-display").textContent = (Date.now() - pingStart) + " ms";
+  setTimeout(() => { pingStart = Date.now(); socket.emit("ping_req"); }, 3000);
+});
+
+socket.on("status", d => {
+  setDot("dot-serial", d.serial_connected);
+  if (!d.serial_connected) addLog("sys", "ESP32 serial not detected");
+});
+
+socket.on("battery_update", d => updateBattery(d.level));
+
+socket.on("detection", d => {
+  totalDets++;
+  document.getElementById("det-count").textContent = `OBJECTS: ${totalDets}`;
+  if (!d.threat) {
+    addLog("detection", `${d.label.toUpperCase()} — ${Math.round(d.confidence*100)}%`);
+  }
+  if (d.bbox) drawBox(d.bbox, d.label, d.confidence, d.threat);
+});
+
+socket.on("alert", d => {
+  totalThreats++;
+  document.getElementById("threat-count").textContent = `THREATS: ${totalThreats}`;
+  addLog("threat", d.message);
+  flashThreat();
+  if (d.bbox) drawBox(d.bbox, d.label, d.confidence, true);
+  notifyThreat(d.label, d.confidence);
+});
+
+socket.on("obstacle", d => {
+  addLog("obstacle", `⚠ Obstacle ${d.distance}mm @ ${d.angle}°`);
+  document.getElementById("obstacle-warn").style.display = "inline";
+  setTimeout(() => document.getElementById("obstacle-warn").style.display = "none", 3000);
+});
+
+socket.on("lidar_scan", d => {
+  if (d.points && d.points.length) {
+    lidarActive = true;
+    setDot("dot-lidar", true);
+    drawLidar(d.points);
+    document.getElementById("lidar-points").textContent = d.points.length + " pts";
+  }
+});
+
+// ── Battery ───────────────────────────────────────────────────────────────────
+function updateBattery(level) {
+  const pct = Math.round(level);
+  const color = pct > 40 ? "var(--green)" : pct > 20 ? "var(--amber)" : "var(--red)";
+  document.getElementById("bat-bar").style.cssText       = `width:${pct}%;background:${color}`;
+  document.getElementById("bat-icon-fill").style.cssText = `width:${pct}%;background:${color}`;
+  document.getElementById("bat-pct").textContent         = pct + "%";
+  document.getElementById("bat-pct").className           = "battery-pct" + (pct<=20?" crit":pct<=40?" warn":"");
+}
+
+// ── Bounding boxes on canvas ──────────────────────────────────────────────────
+function drawBox(bbox, label, conf, threat) {
+  const canvas = document.getElementById("det-canvas");
+  const feed   = document.getElementById("camera-feed");
+  canvas.width  = feed.clientWidth  || canvas.parentElement.clientWidth;
+  canvas.height = feed.clientHeight || canvas.parentElement.clientHeight;
+  const ctx = canvas.getContext("2d");
+  const [x1, y1, w, h] = bbox;
+  const px = x1*canvas.width, py = y1*canvas.height;
+  const pw = w*canvas.width,  ph = h*canvas.height;
+  ctx.strokeStyle = threat ? "#ff3333" : "#ffaa00";
+  ctx.lineWidth   = 2;
+  ctx.shadowColor = threat ? "#ff3333" : "#ffaa00";
+  ctx.shadowBlur  = 12;
+  ctx.strokeRect(px, py, pw, ph);
+  ctx.fillStyle = threat ? "#ff3333" : "#ffaa00";
+  ctx.font      = "bold 11px 'Share Tech Mono'";
+  ctx.fillText(`${label} ${Math.round(conf*100)}%`, px+4, py-6);
+  setTimeout(() => ctx.clearRect(0,0,canvas.width,canvas.height), 3000);
+}
+
+// ── LiDAR radar ───────────────────────────────────────────────────────────────
+function drawLidar(points) {
+  const canvas = document.getElementById("lidar-canvas");
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H/2;
+  const maxR = Math.min(cx, cy) - 4;
+  const scale = maxR / 12000;  // 12m range
+
+  ctx.clearRect(0,0,W,H);
+
+  // Grid rings
+  ctx.strokeStyle = "rgba(0,255,136,0.12)";
+  ctx.lineWidth = 1;
+  [3000,6000,9000,12000].forEach(r => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r*scale, 0, Math.PI*2);
+    ctx.stroke();
+  });
+
+  // Cross hairs
+  ctx.strokeStyle = "rgba(0,255,136,0.08)";
+  ctx.beginPath(); ctx.moveTo(0,cy); ctx.lineTo(W,cy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,H); ctx.stroke();
+
+  // Points
+  points.forEach(p => {
+    const rad = (p.angle - 90) * Math.PI / 180;
+    const x   = cx + Math.cos(rad) * p.distance * scale;
+    const y   = cy + Math.sin(rad) * p.distance * scale;
+    const close = p.distance < 500;
+    ctx.fillStyle = close ? "#ff3333" : "#00ff88";
+    ctx.shadowColor = close ? "#ff3333" : "#00ff88";
+    ctx.shadowBlur  = close ? 6 : 3;
+    ctx.beginPath(); ctx.arc(x, y, close ? 2.5 : 1.5, 0, Math.PI*2); ctx.fill();
+  });
+
+  // Robot dot
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#ff3c00";
+  ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI*2); ctx.fill();
+}
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+function sendCmd(cmd) {
+  if (socketOnline) socket.emit("control", { cmd, speed });
+  fetch("/api/control", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ cmd, speed })
+  }).catch(()=>{});
+}
+
+function updateSpeed(val) {
+  speed = parseInt(val);
+  document.getElementById("speed-display").textContent = speed + "%";
+}
+
+// D-pad hold-to-move
+document.querySelectorAll(".btn").forEach(btn => {
+  const cmd = btn.dataset.cmd;
+  if (!cmd) return;
+  function start(e) {
+    e.preventDefault(); btn.classList.add("pressed");
+    if (cmd === "stop") { sendCmd("stop"); return; }
+    sendCmd(cmd);
+    holdTimer = setInterval(() => sendCmd(cmd), 120);
+  }
+  function stop(e) {
+    e.preventDefault(); btn.classList.remove("pressed");
+    clearInterval(holdTimer);
+    if (cmd !== "stop") sendCmd("stop");
+  }
+  btn.addEventListener("mousedown",  start);
+  btn.addEventListener("touchstart", start, {passive:false});
+  btn.addEventListener("mouseup",    stop);
+  btn.addEventListener("mouseleave", stop);
+  btn.addEventListener("touchend",   stop);
+});
+
+// Keyboard
+const keyMap = {
+  ArrowUp:"forward", w:"forward", W:"forward",
+  ArrowDown:"backward", s:"backward", S:"backward",
+  ArrowLeft:"left", a:"left", A:"left",
+  ArrowRight:"right", d:"right", D:"right",
+  " ":"stop"
+};
+const keysDown = new Set();
+document.addEventListener("keydown", e => {
+  const cmd = keyMap[e.key];
+  if (!cmd || keysDown.has(e.key)) return;
+  e.preventDefault(); keysDown.add(e.key); sendCmd(cmd);
+  const b = document.getElementById("btn-"+cmd);
+  if (b) b.classList.add("pressed");
+});
+document.addEventListener("keyup", e => {
+  const cmd = keyMap[e.key];
+  if (!cmd) return;
+  e.preventDefault(); keysDown.delete(e.key);
+  if (cmd !== "stop") sendCmd("stop");
+  const b = document.getElementById("btn-"+cmd);
+  if (b) b.classList.remove("pressed");
+});
+
+// ── Detection toggle ──────────────────────────────────────────────────────────
+function toggleDetection(enabled) {
+  detActive = enabled;
+  socket.emit("toggle_detection", {enabled});
+  fetch("/api/detection",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({enabled})}).catch(()=>{});
+  const s = document.getElementById("det-status");
+  s.textContent = enabled ? "● SCANNING" : "STANDBY";
+  s.className   = "det-status" + (enabled ? " active" : "");
+}
+
+// ── Auto mode toggle ──────────────────────────────────────────────────────────
+function toggleAuto(enabled) {
+  autoActive = enabled;
+  socket.emit("toggle_auto", {enabled});
+  fetch("/api/auto",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({enabled})}).catch(()=>{});
+  const s = document.getElementById("auto-status");
+  s.textContent = enabled ? "● AUTO NAV" : "MANUAL";
+  s.className   = "det-status" + (enabled ? " active" : "");
+  addLog("sys", enabled ? "Autonomous navigation ON" : "Manual control ON");
+}
+
+// ── Log ───────────────────────────────────────────────────────────────────────
+function addLog(type, msg) {
+  const log  = document.getElementById("alerts-log");
+  const item = document.createElement("div");
+  const cls  = {threat:"threat",detection:"detection",obstacle:"obstacle"}[type] || "";
+  item.className = "alert-item " + cls;
+  const ts = new Date().toISOString().split("T")[1].split(".")[0];
+  item.innerHTML = `<div class="alert-time">${ts} UTC</div><div class="alert-msg">${msg}</div>`;
+  log.prepend(item);
+  while (log.children.length > 40) log.removeChild(log.lastChild);
+}
+
+// ── UX helpers ────────────────────────────────────────────────────────────────
+function flashThreat() {
+  const el = document.getElementById("threat-flash");
+  el.classList.remove("active"); void el.offsetWidth; el.classList.add("active");
+}
+
+function notifyThreat(label, conf) {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "granted") {
+    new Notification("⚠ SENTRY ALERT", {
+      body: `${label.toUpperCase()} — ${Math.round(conf*100)}% confidence`
+    });
+  } else if (Notification.permission !== "denied") {
+    Notification.requestPermission();
+  }
+}
+
+function setDot(id, online) {
+  const el = document.getElementById(id);
+  if (el) el.className = "conn-dot " + (online ? "online" : "offline");
+}
+
+// ── Clock ─────────────────────────────────────────────────────────────────────
+setInterval(() => {
+  const now = new Date();
+  document.getElementById("clock").textContent =
+    now.toISOString().split("T")[1].split(".")[0];
+  document.getElementById("feed-timestamp").textContent =
+    now.toISOString().replace("T"," ").split(".")[0] + " UTC";
+}, 1000);
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+if ("Notification" in window && Notification.permission === "default") {
+  Notification.requestPermission();
+}
+setInterval(() => {
+  if (!lidarActive) setDot("dot-lidar", false);
+  lidarActive = false;
+}, 5000);
+addLog("sys", "SENTRY dashboard initialised");
+</script>
+</body>
+</html>

@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>SENTRY Mobile</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg: #080808;
+  --surface: #111111;
+  --border: #222;
+  --accent: #ff3c00;
+  --accent2: #ffaa00;
+  --green: #00ff88;
+  --text: #f0f0f0;
+  --muted: #555;
+  --danger: #ff3c00;
+  --safe: #00ff88;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  overflow: hidden;
+  touch-action: none;
+}
+
+/* ── SCREENS ── */
+.screen { position: fixed; inset: 0; display: flex; flex-direction: column; transition: opacity 0.3s, transform 0.3s; }
+.screen.hidden { opacity: 0; pointer-events: none; transform: translateY(20px); }
+
+/* ── CONNECT SCREEN ── */
+#screen-connect {
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  background: var(--bg);
+  padding: 32px 24px;
+}
+
+.logo-block {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.logo-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 72px;
+  letter-spacing: 12px;
+  color: var(--text);
+  line-height: 1;
+  position: relative;
+  display: inline-block;
+}
+
+.logo-title::after {
+  content: '';
+  position: absolute;
+  bottom: -4px; left: 0; right: 0;
+  height: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 16px var(--accent);
+}
+
+.logo-sub {
+  font-size: 10px;
+  letter-spacing: 6px;
+  color: var(--muted);
+  margin-top: 12px;
+  text-transform: uppercase;
+}
+
+.connect-form {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.input-label {
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.input-field {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-size: 15px;
+  padding: 14px 16px;
+  border-radius: 4px;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+
+.input-field:focus { border-color: var(--accent); }
+.input-field::placeholder { color: var(--muted); }
+
+.btn-connect {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 4px;
+  padding: 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 8px;
+  transition: opacity 0.2s, transform 0.1s;
+  active: scale(0.97);
+}
+
+.btn-connect:active { transform: scale(0.97); opacity: 0.85; }
+
+.mode-tabs {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 320px;
+  margin-bottom: -8px;
+}
+
+.mode-tab {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.2s;
+}
+
+.mode-tab.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(255,60,0,0.08);
+}
+
+/* ── MAIN SCREEN ── */
+#screen-main { background: #000; }
+
+/* Camera / feed area */
+.feed-container {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  background: #000;
+}
+
+#local-video, #remote-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#remote-img { display: none; }
+
+/* Detection canvas overlay */
+#det-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* HUD overlays */
+.hud-corners::before, .hud-corners::after,
+.hud-corner-br, .hud-corner-bl {
+  content: '';
+  position: absolute;
+  width: 24px; height: 24px;
+  border-color: rgba(255,60,0,0.7);
+  border-style: solid;
+  z-index: 11;
+  pointer-events: none;
+}
+.hud-corners::before { top: 12px; left: 12px; border-width: 2px 0 0 2px; }
+.hud-corners::after  { top: 12px; right: 12px; border-width: 2px 2px 0 0; }
+.hud-corner-br { bottom: 12px; right: 12px; border-width: 0 2px 2px 0; }
+.hud-corner-bl { bottom: 12px; left: 12px;  border-width: 0 0 2px 2px; }
+
+.hud-top {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  z-index: 12;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+  pointer-events: none;
+}
+
+.hud-bottom {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  z-index: 12;
+  background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+  pointer-events: none;
+}
+
+.hud-tag {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+}
+
+.hud-mode {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 14px;
+  letter-spacing: 3px;
+  color: var(--accent);
+}
+
+.rec-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.6);
+}
+
+.rec-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: blink 1.2s step-end infinite;
+}
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* Threat flash */
+#threat-flash {
+  position: absolute;
+  inset: 0;
+  background: rgba(255,60,0,0.2);
+  z-index: 20;
+  opacity: 0;
+  pointer-events: none;
+}
+#threat-flash.flash { animation: flash-anim 0.6s ease-out forwards; }
+@keyframes flash-anim { 0%{opacity:1} 100%{opacity:0} }
+
+/* ── BOTTOM PANEL ── */
+.bottom-panel {
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* Tabs */
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px 8px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.2s;
+}
+
+.tab-btn.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+/* Tab content */
+.tab-content { display: none; padding: 16px; }
+.tab-content.active { display: block; }
+
+/* Controls tab */
+.dpad-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 52px);
+  grid-template-rows: repeat(3, 52px);
+  gap: 6px;
+}
+
+.dbtn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 20px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  transition: background 0.1s, transform 0.1s;
+  -webkit-touch-callout: none;
+}
+
+.dbtn:active, .dbtn.pressed {
+  background: #1a1a1a;
+  border-color: var(--accent);
+  transform: scale(0.92);
+  box-shadow: 0 0 12px rgba(255,60,0,0.3);
+}
+
+.dbtn-stop {
+  background: rgba(255,60,0,0.1);
+  border-color: rgba(255,60,0,0.4);
+  color: var(--accent);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 13px;
+  letter-spacing: 2px;
+}
+
+.speed-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.speed-val {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 36px;
+  color: var(--text);
+  line-height: 1;
+}
+
+.speed-lbl {
+  font-size: 8px;
+  letter-spacing: 3px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+input[type=range].speed-slider {
+  -webkit-appearance: none;
+  width: 80px;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  height: 100px;
+  width: 3px;
+}
+
+input[type=range].speed-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--accent);
+}
+
+/* Detection tab */
+.det-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.det-toggle-label {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--text);
+  text-transform: uppercase;
+}
+
+.toggle {
+  position: relative;
+  width: 52px; height: 28px;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: #222;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+.toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 4px; left: 4px;
+  width: 18px; height: 18px;
+  background: var(--muted);
+  border-radius: 50%;
+  transition: 0.3s;
+}
+.toggle input:checked + .toggle-track {
+  border-color: var(--accent);
+  background: rgba(255,60,0,0.15);
+}
+.toggle input:checked + .toggle-track::after {
+  transform: translateX(24px);
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+.det-log {
+  max-height: 80px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  scrollbar-width: none;
+}
+
+.det-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--surface);
+  border-radius: 3px;
+  border-left: 2px solid var(--muted);
+  animation: slide-in 0.2s ease;
+}
+.det-entry.threat { border-left-color: var(--accent); background: rgba(255,60,0,0.08); }
+.det-entry.safe   { border-left-color: var(--green);  background: rgba(0,255,136,0.05); }
+@keyframes slide-in { from{opacity:0;transform:translateX(8px)} to{opacity:1;transform:none} }
+
+.det-name { font-size: 11px; color: var(--text); }
+.det-entry.threat .det-name { color: var(--accent); }
+.det-conf { font-size: 10px; color: var(--muted); }
+
+/* Status tab */
+.status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.stat-label {
+  font-size: 8px;
+  letter-spacing: 3px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.stat-value {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  line-height: 1;
+  color: var(--text);
+}
+
+.stat-value.ok   { color: var(--green); }
+.stat-value.warn { color: var(--accent2); }
+.stat-value.bad  { color: var(--accent); }
+
+.bat-bar {
+  width: 100%;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+.bat-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 2px;
+  transition: width 1s;
+}
+
+/* Disconnect btn */
+.btn-disconnect {
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+/* Alert toast */
+#alert-toast {
+  position: fixed;
+  top: -80px;
+  left: 16px; right: 16px;
+  background: var(--accent);
+  color: #fff;
+  padding: 14px 16px;
+  border-radius: 6px;
+  z-index: 100;
+  font-size: 12px;
+  letter-spacing: 1px;
+  transition: top 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#alert-toast.show { top: 16px; }
+#alert-toast .toast-icon { font-size: 18px; }
+#alert-toast .toast-text { flex: 1; line-height: 1.4; }
+
+/* Connection status dot */
+.conn-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  display: inline-block;
+}
+.conn-dot.online  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.conn-dot.offline { background: var(--accent); }
+
+/* Camera source selector */
+.cam-source-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.cam-source-btn {
+  flex: 1;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.2s;
+}
+.cam-source-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(255,60,0,0.08);
+}
+</style>
+</head>
+<body>
+
+<!-- ── ALERT TOAST ── -->
+<div id="alert-toast">
+  <span class="toast-icon">⚠</span>
+  <div class="toast-text" id="toast-text">Threat detected</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN 1: CONNECT
+══════════════════════════════════════════════════ -->
+<div class="screen" id="screen-connect">
+  <div class="logo-block">
+    <div class="logo-title">SENTRY</div>
+    <div class="logo-sub">Mobile Command Interface</div>
+  </div>
+
+  <div class="mode-tabs">
+    <button class="mode-tab active" id="tab-pi" onclick="setMode('pi')">Pi Robot</button>
+    <button class="mode-tab" id="tab-phone" onclick="setMode('phone')">Phone Camera</button>
+  </div>
+
+  <div class="connect-form">
+    <div class="input-group" id="ip-group">
+      <div class="input-label">Raspberry Pi IP Address</div>
+      <input class="input-field" id="pi-ip" type="text"
+             placeholder="192.168.1.xx:5000"
+             value="192.168.1.1:5000">
+    </div>
+    <button class="btn-connect" onclick="connect()">CONNECT</button>
+    <div style="text-align:center;font-size:10px;color:var(--muted);letter-spacing:1px;margin-top:4px" id="connect-hint">
+      Enter your Pi's IP from the robot server terminal
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     SCREEN 2: MAIN
+══════════════════════════════════════════════════ -->
+<div class="screen hidden" id="screen-main">
+
+  <!-- Camera feed area -->
+  <div class="feed-container hud-corners" id="feed-container">
+    <div class="hud-corner-br"></div>
+    <div class="hud-corner-bl"></div>
+
+    <!-- Phone camera (local) -->
+    <video id="local-video" autoplay playsinline muted></video>
+
+    <!-- Pi camera (remote MJPEG) -->
+    <img id="remote-img" alt="Pi feed">
+
+    <!-- Detection canvas -->
+    <canvas id="det-canvas"></canvas>
+
+    <!-- Threat flash -->
+    <div id="threat-flash"></div>
+
+    <!-- HUD top -->
+    <div class="hud-top">
+      <div>
+        <div class="hud-mode" id="hud-mode">PI FEED</div>
+        <div class="hud-tag" id="hud-sub">--</div>
+      </div>
+      <div class="rec-indicator">
+        <div class="rec-dot"></div>
+        <span id="hud-time">--:--:--</span>
+      </div>
+    </div>
+
+    <!-- HUD bottom -->
+    <div class="hud-bottom">
+      <div class="hud-tag" id="hud-det-count">OBJECTS: 0</div>
+      <div class="hud-tag" id="hud-threat-count" style="color:var(--accent)">THREATS: 0</div>
+    </div>
+  </div>
+
+  <!-- Bottom panel -->
+  <div class="bottom-panel">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('controls', this)">Controls</button>
+      <button class="tab-btn"        onclick="switchTab('detect',   this)">Detection</button>
+      <button class="tab-btn"        onclick="switchTab('status',   this)">Status</button>
+    </div>
+
+    <!-- CONTROLS TAB -->
+    <div class="tab-content active" id="tab-controls">
+      <div class="dpad-container">
+        <div class="dpad">
+          <div></div>
+          <div class="dbtn" data-cmd="forward">▲</div>
+          <div></div>
+          <div class="dbtn" data-cmd="left">◀</div>
+          <div class="dbtn dbtn-stop" data-cmd="stop">STOP</div>
+          <div class="dbtn" data-cmd="right">▶</div>
+          <div></div>
+          <div class="dbtn" data-cmd="backward">▼</div>
+          <div></div>
+        </div>
+
+        <div class="speed-block">
+          <div class="speed-lbl">Speed</div>
+          <input type="range" class="speed-slider" min="10" max="100" value="80"
+                 id="speed-slider" oninput="updateSpeed(this.value)" orient="vertical">
+          <div class="speed-val" id="speed-val">80%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DETECTION TAB -->
+    <div class="tab-content" id="tab-detect">
+      <!-- Camera source (only shown in phone mode) -->
+      <div class="cam-source-row" id="cam-source-row" style="display:none">
+        <button class="cam-source-btn active" id="src-phone" onclick="setCamSource('phone')">Phone Cam</button>
+        <button class="cam-source-btn" id="src-pi" onclick="setCamSource('pi')">Pi Feed</button>
+      </div>
+      <div class="det-toggle-row">
+        <span class="det-toggle-label">AI Scan</span>
+        <label class="toggle">
+          <input type="checkbox" id="det-toggle" onchange="toggleDetection(this.checked)">
+          <div class="toggle-track"></div>
+        </label>
+      </div>
+      <div class="det-log" id="det-log">
+        <div style="text-align:center;font-size:10px;color:var(--muted);padding:8px;letter-spacing:1px">
+          AWAITING SCAN
+        </div>
+      </div>
+    </div>
+
+    <!-- STATUS TAB -->
+    <div class="tab-content" id="tab-status">
+      <div class="status-grid">
+        <div class="stat-card">
+          <div class="stat-label">Battery</div>
+          <div class="stat-value ok" id="stat-bat">--%</div>
+          <div class="bat-bar"><div class="bat-fill" id="bat-fill" style="width:0%"></div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Server</div>
+          <div class="stat-value" id="stat-conn" style="font-size:14px;padding-top:4px">
+            <span class="conn-dot" id="conn-dot"></span> --
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">ESP32</div>
+          <div class="stat-value" id="stat-serial" style="font-size:14px;padding-top:4px">
+            <span class="conn-dot" id="serial-dot"></span> --
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Detections</div>
+          <div class="stat-value" id="stat-dets">0</div>
+        </div>
+      </div>
+      <button class="btn-disconnect" onclick="disconnect()">Disconnect</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let mode         = 'pi';      // 'pi' or 'phone'
+let camSource    = 'phone';   // which feed to run inference on in phone mode
+let piBase       = '';
+let speed        = 80;
+let detEnabled   = false;
+let totalDets    = 0;
+let totalThreats = 0;
+let socket       = null;
+let holdTimer    = null;
+let localStream  = null;
+let inferTimer   = null;
+let tfliteModel  = null;      // future: local tflite.js model
+let toastTimer   = null;
+
+// ── Mode selection ─────────────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  document.getElementById('tab-pi').classList.toggle('active', m === 'pi');
+  document.getElementById('tab-phone').classList.toggle('active', m === 'phone');
+  const hint = document.getElementById('connect-hint');
+  const ipGroup = document.getElementById('ip-group');
+  if (m === 'phone') {
+    hint.textContent = 'Phone camera → sends frames to Pi for detection';
+    ipGroup.style.display = 'flex';
+  } else {
+    hint.textContent = "Enter your Pi's IP from the robot server terminal";
+    ipGroup.style.display = 'flex';
+  }
+}
+
+// ── Connect ────────────────────────────────────────────────────────────────
+async function connect() {
+  const ip = document.getElementById('pi-ip').value.trim();
+  if (!ip) { alert('Enter Pi IP address'); return; }
+  piBase = 'http://' + ip;
+
+  showScreen('main');
+
+  if (mode === 'pi') {
+    startPiFeed();
+    document.getElementById('hud-mode').textContent = 'PI FEED';
+    document.getElementById('cam-source-row').style.display = 'none';
+  } else {
+    startPhoneCamera();
+    document.getElementById('hud-mode').textContent = 'PHONE CAM';
+    document.getElementById('cam-source-row').style.display = 'flex';
+  }
+
+  connectSocket(ip);
+}
+
+function disconnect() {
+  showScreen('connect');
+  if (socket) { socket.close(); socket = null; }
+  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  clearInterval(inferTimer);
+  document.getElementById('remote-img').style.display = 'none';
+  document.getElementById('local-video').style.display = 'block';
+}
+
+// ── Screens ────────────────────────────────────────────────────────────────
+function showScreen(name) {
+  document.getElementById('screen-connect').classList.toggle('hidden', name !== 'connect');
+  document.getElementById('screen-main').classList.toggle('hidden', name !== 'main');
+}
+
+// ── Pi MJPEG feed ──────────────────────────────────────────────────────────
+function startPiFeed() {
+  const img = document.getElementById('remote-img');
+  const vid = document.getElementById('local-video');
+  img.src = piBase + '/video_feed?' + Date.now();
+  img.style.display = 'block';
+  vid.style.display = 'none';
+  img.onerror = () => {
+    document.getElementById('hud-sub').textContent = 'FEED UNAVAILABLE';
+  };
+  img.onload = () => {
+    document.getElementById('hud-sub').textContent = piBase;
+  };
+}
+
+// ── Phone camera ───────────────────────────────────────────────────────────
+async function startPhoneCamera() {
+  const vid = document.getElementById('local-video');
+  const img = document.getElementById('remote-img');
+  img.style.display = 'none';
+  vid.style.display = 'block';
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: 640, height: 480 },
+      audio: false
+    });
+    vid.srcObject = localStream;
+    document.getElementById('hud-sub').textContent = 'REAR CAMERA';
+  } catch(e) {
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      vid.srcObject = localStream;
+      document.getElementById('hud-sub').textContent = 'FRONT CAMERA';
+    } catch(e2) {
+      document.getElementById('hud-sub').textContent = 'CAMERA ERROR';
+    }
+  }
+}
+
+function setCamSource(src) {
+  camSource = src;
+  document.getElementById('src-phone').classList.toggle('active', src === 'phone');
+  document.getElementById('src-pi').classList.toggle('active', src === 'pi');
+  if (src === 'pi') {
+    startPiFeed();
+  } else {
+    startPhoneCamera();
+  }
+}
+
+// ── WebSocket ──────────────────────────────────────────────────────────────
+function connectSocket(ip) {
+  try {
+    // Load socket.io dynamically from the Pi server
+    const script = document.createElement('script');
+    script.src = 'http://' + ip + '/socket.io/socket.io.js';
+    script.onload = () => {
+      socket = io('http://' + ip, { transports: ['websocket'] });
+
+      socket.on('connect', () => {
+        setConnDot('conn-dot', true);
+        document.getElementById('stat-conn').innerHTML = '<span class="conn-dot online"></span> ONLINE';
+      });
+
+      socket.on('disconnect', () => {
+        setConnDot('conn-dot', false);
+        document.getElementById('stat-conn').innerHTML = '<span class="conn-dot offline"></span> OFFLINE';
+      });
+
+      socket.on('battery_update', d => updateBattery(d.level));
+
+      socket.on('status', d => {
+        const dot = d.serial_connected ? 'online' : 'offline';
+        const txt = d.serial_connected ? 'ONLINE' : 'OFFLINE';
+        document.getElementById('stat-serial').innerHTML = `<span class="conn-dot ${dot}"></span> ${txt}`;
+      });
+
+      socket.on('detection', d => {
+        totalDets++;
+        document.getElementById('hud-det-count').textContent = `OBJECTS: ${totalDets}`;
+        document.getElementById('stat-dets').textContent = totalDets;
+        addDetEntry(d.label, d.confidence, d.threat, d.bbox);
+        if (d.bbox) drawBox(d.bbox, d.label, d.confidence, d.threat);
+      });
+
+      socket.on('alert', d => {
+        totalThreats++;
+        document.getElementById('hud-threat-count').textContent = `THREATS: ${totalThreats}`;
+        showToast(`${d.label.toUpperCase()} — ${Math.round(d.confidence * 100)}%`);
+        flashThreat();
+        vibrate();
+        pushNotify(d.label, d.confidence);
+      });
+    };
+    script.onerror = () => {
+      document.getElementById('stat-conn').innerHTML = '<span class="conn-dot offline"></span> NO SERVER';
+    };
+    document.head.appendChild(script);
+  } catch(e) {
+    console.warn('Socket.io load failed:', e);
+  }
+}
+
+// ── Detection toggle ───────────────────────────────────────────────────────
+function toggleDetection(enabled) {
+  detEnabled = enabled;
+
+  // Tell Pi server
+  fetch(piBase + '/api/detection', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled })
+  }).catch(() => {});
+
+  if (socket) socket.emit('toggle_detection', { enabled });
+
+  // If phone mode — start sending frames to Pi for inference
+  if (enabled && mode === 'phone' && camSource === 'phone') {
+    startPhoneInference();
+  } else {
+    clearInterval(inferTimer);
+  }
+}
+
+// ── Phone → Pi inference (send frame to Pi for processing) ─────────────────
+function startPhoneInference() {
+  clearInterval(inferTimer);
+  const canvas = document.createElement('canvas');
+  canvas.width = 320; canvas.height = 240;
+  const ctx = canvas.getContext('2d');
+  const vid = document.getElementById('local-video');
+
+  inferTimer = setInterval(() => {
+    if (!detEnabled || !vid.videoWidth) return;
+    ctx.drawImage(vid, 0, 0, 320, 240);
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const fd = new FormData();
+      fd.append('frame', blob, 'frame.jpg');
+      fetch(piBase + '/api/infer', { method: 'POST', body: fd }).catch(() => {});
+    }, 'image/jpeg', 0.7);
+  }, 500);  // 2fps
+}
+
+// ── Motor controls ─────────────────────────────────────────────────────────
+function sendCmd(cmd) {
+  if (socket && socket.connected) {
+    socket.emit('control', { cmd, speed });
+  }
+  fetch(piBase + '/api/control', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cmd, speed })
+  }).catch(() => {});
+}
+
+function updateSpeed(val) {
+  speed = parseInt(val);
+  document.getElementById('speed-val').textContent = speed + '%';
+}
+
+// D-pad hold-to-move
+document.querySelectorAll('.dbtn').forEach(btn => {
+  const cmd = btn.dataset.cmd;
+  function start(e) {
+    e.preventDefault();
+    btn.classList.add('pressed');
+    sendCmd(cmd);
+    if (cmd !== 'stop') holdTimer = setInterval(() => sendCmd(cmd), 120);
+  }
+  function stop(e) {
+    e.preventDefault();
+    btn.classList.remove('pressed');
+    clearInterval(holdTimer);
+    if (cmd !== 'stop') sendCmd('stop');
+  }
+  btn.addEventListener('touchstart', start, { passive: false });
+  btn.addEventListener('touchend',   stop,  { passive: false });
+  btn.addEventListener('mousedown',  start);
+  btn.addEventListener('mouseup',    stop);
+  btn.addEventListener('mouseleave', stop);
+});
+
+// ── Detection canvas boxes ─────────────────────────────────────────────────
+function drawBox(bbox, label, conf, threat) {
+  const canvas = document.getElementById('det-canvas');
+  const container = document.getElementById('feed-container');
+  canvas.width  = container.clientWidth;
+  canvas.height = container.clientHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const [x1, y1, w, h] = bbox;
+  const px = x1 * canvas.width;
+  const py = y1 * canvas.height;
+  const pw = w  * canvas.width;
+  const ph = h  * canvas.height;
+
+  ctx.strokeStyle = threat ? '#ff3c00' : '#ffaa00';
+  ctx.lineWidth   = 2;
+  ctx.shadowColor = threat ? '#ff3c00' : '#ffaa00';
+  ctx.shadowBlur  = 10;
+  ctx.strokeRect(px, py, pw, ph);
+
+  ctx.fillStyle = threat ? '#ff3c00' : '#ffaa00';
+  ctx.font      = 'bold 11px DM Mono';
+  ctx.fillText(`${label} ${Math.round(conf * 100)}%`, px + 4, py - 6);
+
+  setTimeout(() => ctx.clearRect(0, 0, canvas.width, canvas.height), 3000);
+}
+
+// ── Detection log ──────────────────────────────────────────────────────────
+function addDetEntry(label, conf, threat) {
+  const log = document.getElementById('det-log');
+  // Clear placeholder
+  if (log.children.length === 1 && log.children[0].style.textAlign === 'center') {
+    log.innerHTML = '';
+  }
+  const entry = document.createElement('div');
+  entry.className = 'det-entry ' + (threat ? 'threat' : 'safe');
+  entry.innerHTML = `<span class="det-name">${label}</span><span class="det-conf">${Math.round(conf * 100)}%</span>`;
+  log.insertBefore(entry, log.firstChild);
+  while (log.children.length > 8) log.removeChild(log.lastChild);
+}
+
+// ── Battery ────────────────────────────────────────────────────────────────
+function updateBattery(level) {
+  const pct = Math.round(level);
+  document.getElementById('stat-bat').textContent = pct + '%';
+  document.getElementById('stat-bat').className = 'stat-value ' + (pct > 40 ? 'ok' : pct > 20 ? 'warn' : 'bad');
+  document.getElementById('bat-fill').style.width = pct + '%';
+  document.getElementById('bat-fill').style.background = pct > 40 ? 'var(--green)' : pct > 20 ? 'var(--accent2)' : 'var(--accent)';
+}
+
+// ── UX helpers ─────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const toast = document.getElementById('alert-toast');
+  document.getElementById('toast-text').textContent = '⚠ THREAT: ' + msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
+}
+
+function flashThreat() {
+  const el = document.getElementById('threat-flash');
+  el.classList.remove('flash');
+  void el.offsetWidth;
+  el.classList.add('flash');
+}
+
+function vibrate() {
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+}
+
+function pushNotify(label, conf) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    new Notification('⚠ SENTRY ALERT', {
+      body: `${label.toUpperCase()} detected — ${Math.round(conf * 100)}% confidence`,
+    });
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission();
+  }
+}
+
+function setConnDot(id, online) {
+  const el = document.getElementById(id);
+  if (el) el.className = 'conn-dot ' + (online ? 'online' : 'offline');
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ── Clock ──────────────────────────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById('hud-time').textContent =
+    new Date().toTimeString().split(' ')[0];
+}, 1000);
+
+// ── Init ───────────────────────────────────────────────────────────────────
+if ('Notification' in window && Notification.permission === 'default') {
+  Notification.requestPermission();
+}
+</script>
+</body>
+</html>

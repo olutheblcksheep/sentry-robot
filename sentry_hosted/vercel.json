@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "name": "sentry-cloud-dashboard",
+  "builds": [
+    {
+      "src": "cloud-dashboard/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "cloud-dashboard/$1"
+    }
+  ]
+}

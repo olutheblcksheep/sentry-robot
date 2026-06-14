@@ -1,0 +1,590 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Sentry LiDAR Dashboard — style.css
+   Premium dark radar aesthetic with glassmorphism cards.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── RESET & TOKENS ─────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    /* Backgrounds */
+    --bg-base:       #06080d;
+    --bg-surface:    #0d1117;
+    --bg-card:       rgba(13, 17, 23, 0.75);
+    --bg-card-hover: rgba(22, 27, 36, 0.85);
+
+    /* Radar palette */
+    --radar-bg:      #080c14;
+    --radar-grid:    rgba(0, 255, 170, 0.07);
+    --radar-ring:    rgba(0, 255, 170, 0.12);
+    --scan-point:    #00ffaa;
+    --scan-glow:     rgba(0, 255, 170, 0.45);
+    --scan-dim:      rgba(0, 255, 170, 0.15);
+
+    /* Accent */
+    --accent:        #00ffaa;
+    --accent-dim:    rgba(0, 255, 170, 0.15);
+    --accent-hover:  #33ffbb;
+    --target-color:  #ff3366;
+    --target-glow:   rgba(255, 51, 102, 0.35);
+    --warning:       #ffaa00;
+
+    /* Text */
+    --text-primary:  #e6edf3;
+    --text-secondary:#8b949e;
+    --text-muted:    #484f58;
+
+    /* Borders */
+    --border:        rgba(48, 54, 61, 0.6);
+    --border-accent: rgba(0, 255, 170, 0.2);
+
+    /* Typography */
+    --font-sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono:  'JetBrains Mono', 'Fira Code', monospace;
+
+    /* Sizing */
+    --topbar-h: 52px;
+    --panel-w:  380px;
+    --radius:   10px;
+    --radius-sm: 6px;
+}
+
+html, body {
+    height: 100%;
+    font-family: var(--font-sans);
+    background: var(--bg-base);
+    color: var(--text-primary);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── TOP BAR ────────────────────────────────────────────────────── */
+#topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: var(--topbar-h);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    background: rgba(6, 8, 13, 0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    z-index: 100;
+}
+
+.topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logo-mark {
+    font-size: 22px;
+    color: var(--accent);
+    text-shadow: 0 0 12px var(--scan-glow);
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+    0%, 100% { text-shadow: 0 0 8px var(--scan-glow); }
+    50%      { text-shadow: 0 0 20px var(--scan-glow), 0 0 40px rgba(0,255,170,0.15); }
+}
+
+#topbar h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 2px;
+}
+
+.badge {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--border-accent);
+    transition: all 0.3s;
+}
+.badge.live     { background: rgba(0,255,170,0.12); color: #00ffaa; border-color: rgba(0,255,170,0.3); }
+.badge.simulate { background: rgba(255,170,0,0.12); color: #ffaa00; border-color: rgba(255,170,0,0.3); }
+.badge.error    { background: rgba(255,51,102,0.12); color: #ff3366; border-color: rgba(255,51,102,0.3); }
+
+.nav-link {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-decoration: none;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 3px 12px;
+    transition: all 0.2s;
+}
+.nav-link:hover {
+    color: var(--accent);
+    border-color: var(--border-accent);
+    background: var(--accent-dim);
+}
+
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.stat-pill {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.1;
+}
+.stat-label { font-size: 9px; font-weight: 600; letter-spacing: 1px; color: var(--text-muted); }
+.stat-value { font-size: 14px; font-weight: 600; font-family: var(--font-mono); color: var(--accent); }
+
+.status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: background 0.3s;
+}
+.status-dot.online {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--scan-glow);
+    animation: pulse-dot 1.5s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+    0%, 100% { box-shadow: 0 0 4px var(--scan-glow); }
+    50%      { box-shadow: 0 0 14px var(--scan-glow); }
+}
+
+/* ── MAIN LAYOUT ────────────────────────────────────────────────── */
+#app {
+    display: flex;
+    height: calc(100vh - var(--topbar-h));
+    margin-top: var(--topbar-h);
+}
+
+/* ── RADAR SECTION ──────────────────────────────────────────────── */
+#radar-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    position: relative;
+    min-width: 0;
+}
+
+#radar-container {
+    position: relative;
+    width: min(calc(100vh - var(--topbar-h) - 100px), calc(100vw - var(--panel-w) - 80px));
+    height: 0;
+    padding-bottom: min(calc(100vh - var(--topbar-h) - 100px), calc(100vw - var(--panel-w) - 80px));
+    max-width: 700px;
+    max-height: 700px;
+    /* For absolute children */
+    aspect-ratio: 1;
+}
+
+#radar-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--radar-bg);
+    border: 1px solid var(--border-accent);
+    box-shadow:
+        0 0 40px rgba(0, 255, 170, 0.05),
+        inset 0 0 60px rgba(0, 0, 0, 0.4);
+    cursor: crosshair;
+}
+
+/* Crosshair lines */
+#radar-crosshair-h,
+#radar-crosshair-v {
+    position: absolute;
+    pointer-events: none;
+}
+#radar-crosshair-h {
+    top: 50%; left: 0; right: 0;
+    height: 1px;
+    background: var(--radar-grid);
+}
+#radar-crosshair-v {
+    left: 50%; top: 0; bottom: 0;
+    width: 1px;
+    background: var(--radar-grid);
+}
+
+/* Robot centre marker */
+#robot-icon {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    color: var(--accent);
+    text-shadow: 0 0 10px var(--scan-glow);
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* Distance ring labels */
+.ring-label {
+    position: absolute;
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+#radar-footer {
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 700px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.zoom-controls button {
+    width: 28px; height: 28px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+.zoom-controls button:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-accent);
+    color: var(--accent);
+}
+
+#zoom-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    min-width: 90px;
+}
+
+/* ── SIDE PANEL ─────────────────────────────────────────────────── */
+#side-panel {
+    width: var(--panel-w);
+    min-width: var(--panel-w);
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    border-left: 1px solid var(--border);
+    background: var(--bg-surface);
+}
+
+/* Scrollbar */
+#side-panel::-webkit-scrollbar { width: 5px; }
+#side-panel::-webkit-scrollbar-track { background: transparent; }
+#side-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+
+/* ── CARDS ──────────────────────────────────────────────────────── */
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    backdrop-filter: blur(8px);
+    transition: border-color 0.2s;
+}
+.card:hover {
+    border-color: var(--border-accent);
+}
+.card h2 {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+}
+
+.mini-card {
+    padding: 14px;
+}
+.mini-card h2 {
+    margin-bottom: 10px;
+}
+
+/* ── TARGET DISPLAY ─────────────────────────────────────────────── */
+.target-display {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    margin-bottom: 14px;
+    text-align: center;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+}
+.target-display.has-target {
+    border-color: var(--target-color);
+    border-style: solid;
+    background: rgba(255, 51, 102, 0.05);
+}
+.target-placeholder {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.target-info {
+    display: flex;
+    gap: 20px;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 500;
+}
+.target-info .coord {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.target-info .coord-label {
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+}
+.target-info .coord-value {
+    color: var(--target-color);
+}
+
+/* ── INPUTS ─────────────────────────────────────────────────────── */
+.input-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.input-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.input-group.full-width { flex: 1 1 100%; }
+
+.input-group label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.input-group input[type="number"] {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+}
+.input-group input[type="number"]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+.speed-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.speed-row input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    outline: none;
+}
+.speed-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 6px var(--scan-glow);
+}
+#speed-label {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    min-width: 36px;
+    text-align: right;
+}
+
+/* ── BUTTONS ────────────────────────────────────────────────────── */
+.btn-primary,
+.btn-secondary {
+    width: 100%;
+    padding: 10px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+.btn-primary {
+    background: var(--accent);
+    color: var(--bg-base);
+    margin-bottom: 8px;
+}
+.btn-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+    box-shadow: 0 0 16px var(--scan-glow);
+}
+.btn-primary:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+.btn-secondary {
+    background: transparent;
+    color: var(--text-secondary);
+    border-color: var(--border);
+}
+.btn-secondary:hover {
+    border-color: var(--text-muted);
+    color: var(--text-primary);
+}
+
+.btn-icon { font-size: 11px; }
+
+/* ── SERIAL PREVIEW ─────────────────────────────────────────────── */
+#serial-preview {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.7;
+}
+
+.serial-hint {
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: 12px;
+}
+
+.serial-block {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    margin-bottom: 10px;
+    overflow-x: auto;
+}
+.serial-block:last-child { margin-bottom: 0; }
+
+.serial-block-title {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.serial-cmd {
+    color: var(--accent);
+    word-break: break-all;
+    user-select: all;
+}
+
+.serial-field {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+}
+.serial-field-name { color: var(--text-secondary); }
+.serial-field-value { color: var(--text-primary); }
+
+.serial-arduino {
+    color: var(--text-secondary);
+    font-size: 11px;
+    white-space: pre;
+    line-height: 1.6;
+}
+
+/* ── READOUT GRID ───────────────────────────────────────────────── */
+.readout-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+.readout-label {
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 1px;
+    align-self: center;
+}
+.readout-value {
+    color: var(--text-primary);
+    text-align: right;
+}
+
+/* ── RESPONSIVE ─────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    #app {
+        flex-direction: column;
+    }
+    #side-panel {
+        width: 100%;
+        min-width: unset;
+        border-left: none;
+        border-top: 1px solid var(--border);
+        max-height: 45vh;
+    }
+    #radar-container {
+        width: min(calc(100vw - 40px), calc(55vh - 60px));
+        padding-bottom: min(calc(100vw - 40px), calc(55vh - 60px));
+        max-width: 500px;
+        max-height: 500px;
+    }
+}
