@@ -490,7 +490,8 @@
                 url = `data:image/jpeg;base64,${data.jpeg}`;
             } else {
                 // assume binary arraybuffer
-                const blob = new Blob([data], { type: "image/jpeg" });
+                const blob = new Blob([new Uint8Array(data)], { type: "image/jpeg" }); 
+
                 if (fallbackImgBlobUrl) {
                     URL.revokeObjectURL(fallbackImgBlobUrl);
                 }
