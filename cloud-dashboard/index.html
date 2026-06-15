@@ -4,175 +4,215 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SENTRY // Cloud Command Portal</title>
-    <meta name="description" content="Remote teleoperation and LiDAR navigation dashboard for the SENTRY robot.">
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <!-- Socket.IO Client -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="threat-flash"></div>
+<div id="threat-flash"></div>
+<div class="shell">
 
-    <div class="shell">
-        <!-- HEADER / CONNECTION BAR -->
-        <header>
-            <div class="logo">SENTRY <span>// CLOUD-PORTAL</span></div>
-            
-            <div class="connection-manager">
-                <input type="text" id="gateway-url" placeholder="Gateway URL (e.g., http://localhost:8080)" value="http://localhost:8080">
-                <button id="btn-connect" class="btn-connect">CONNECT</button>
-            </div>
-
-            <div class="header-meta">
-                <div class="meta-item">
-                    <span class="meta-label">UPLINK</span>
-                    <span class="meta-value" id="ping-display">-- ms</span>
-                </div>
-                <div class="meta-item">
-                    <span class="meta-label">ROBOT STATUS</span>
-                    <span class="meta-value" id="robot-status-badge">DISCONNECTED</span>
-                </div>
-                <div class="meta-item">
-                    <span class="meta-label">UTC</span>
-                    <span class="meta-value" id="clock">--:--:--</span>
-                </div>
-            </div>
-        </header>
-
-        <!-- MAIN CONTENT AREA -->
-        <div class="main-container">
-            <!-- LEFT COLUMN: VIDEO STREAM -->
-            <section class="video-section">
-                <div class="panel-header">LIVE SENSOR FEED</div>
-                <div class="video-container">
-                    <div class="corner-tr"></div>
-                    <div class="corner-tl"></div>
-                    <div class="corner-br"></div>
-                    <div class="corner-bl"></div>
-                    <div class="scan-line"></div>
-                    
-                    <div class="feed-overlay-info">
-                        <span id="stream-type-tag">STREAM: NONE</span>
-                        <span id="resolution-tag">320×240 @ 10fps</span>
-                    </div>
-
-                    <!-- WebRTC Stream Video Element -->
-                    <video id="remote-video" autoplay playsinline style="display:none;"></video>
-                    
-                    <!-- Fallback WebSocket JPEG Stream Element -->
-                    <img id="fallback-img" src="" alt="Live Video Feed" style="display:none;">
-
-                    <div class="feed-placeholder" id="feed-placeholder">
-                        <div class="spinner"></div>
-                        <div class="placeholder-text">AWAITING CONNECTION</div>
-                        <div class="placeholder-sub">Connect to gateway and power on robot</div>
-                    </div>
-                </div>
-
-                <!-- CONTROLS & MANUAL TELEOP -->
-                <div class="teleop-container">
-                    <div class="dpad">
-                        <div></div>
-                        <button class="btn" id="btn-forward" data-cmd="forward">▲</button>
-                        <div></div>
-                        <button class="btn" id="btn-left" data-cmd="left">◀</button>
-                        <button class="btn btn-stop" id="btn-stop" data-cmd="stop">STOP</button>
-                        <button class="btn" id="btn-right" data-cmd="right">▶</button>
-                        <div></div>
-                        <button class="btn" id="btn-backward" data-cmd="backward">▼</button>
-                        <div></div>
-                    </div>
-
-                    <div class="speed-control">
-                        <span class="speed-label">PROPULSION SPEED</span>
-                        <span class="speed-value" id="speed-display">80%</span>
-                        <input type="range" id="speed-slider" min="10" max="100" value="80">
-                    </div>
-
-                    <div class="key-hints">
-                        <div class="key-hint"><span class="key">W</span> FORWARD</div>
-                        <div class="key-hint"><span class="key">S</span> BACKWARD</div>
-                        <div class="key-hint"><span class="key">A</span> LEFT</div>
-                        <div class="key-hint"><span class="key">D</span> RIGHT</div>
-                        <div class="key-hint"><span class="key">SPACE</span> STOP</div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- CENTER COLUMN: LiDAR 2D RADAR MAP -->
-            <section class="map-section">
-                <div class="panel-header">LIDAR 2D RESOLUTION MAP</div>
-                <div class="canvas-container" id="radar-container">
-                    <canvas id="radar-canvas"></canvas>
-                    <div id="radar-crosshair-h"></div>
-                    <div id="radar-crosshair-v"></div>
-                    <div class="robot-marker">◉</div>
-                </div>
-                <div class="canvas-footer">
-                    <span>Click radar plot to set coordinates</span>
-                    <div class="zoom-controls">
-                        <button id="zoom-in" class="zoom-btn">＋</button>
-                        <button id="zoom-out" class="zoom-btn">－</button>
-                        <span id="zoom-label">Range: 4.0 m</span>
-                    </div>
-                </div>
-            </section>
-
-            <!-- RIGHT COLUMN: CONTROL PANEL & LOGS -->
-            <aside class="sidebar-section">
-                <!-- POWER STATUS PANEL -->
-                <div class="panel battery-panel">
-                    <div class="panel-title">SYSTEM POWER</div>
-                    <div class="battery-display">
-                        <div class="battery-icon">
-                            <div class="battery-body">
-                                <div class="battery-fill" id="bat-fill" style="width:0%"></div>
-                            </div>
-                            <div class="battery-tip"></div>
-                        </div>
-                        <div class="battery-pct" id="bat-pct">--%</div>
-                    </div>
-                </div>
-
-                <!-- AUTONOMOUS NAVIGATION CARD -->
-                <div class="panel nav-panel">
-                    <div class="panel-title">NAV TARGET COORDINATES</div>
-                    <div class="target-display" id="target-display">
-                        <span class="target-placeholder">Select coordinate on radar</span>
-                    </div>
-
-                    <div class="coord-inputs">
-                        <div class="input-group">
-                            <label for="input-x">X (mm)</label>
-                            <input type="number" id="input-x" placeholder="0" step="50">
-                        </div>
-                        <div class="input-group">
-                            <label for="input-y">Y (mm)</label>
-                            <input type="number" id="input-y" placeholder="0" step="50">
-                        </div>
-                    </div>
-
-                    <button id="btn-navigate" class="btn-primary" disabled>SEND NAV COMMAND</button>
-                    <button id="btn-clear" class="btn-secondary">CLEAR TARGET</button>
-                </div>
-
-                <!-- EVENT LOGS -->
-                <div class="panel logs-panel">
-                    <div class="panel-title">TACTICAL EVENT LOG</div>
-                    <div class="log-container" id="log-list">
-                        <div class="log-item">
-                            <span class="log-time">[00:00:00]</span>
-                            <span class="log-message system">AWAITING GATEWAY UPLINK...</span>
-                        </div>
-                    </div>
-                </div>
-            </aside>
+    <!-- HEADER -->
+    <header>
+        <div class="logo">SENTRY <span>// CLOUD-PORTAL</span></div>
+        <div class="connection-manager">
+            <input type="text" id="gateway-url" placeholder="Gateway URL" value="https://sentry-robot.onrender.com">
+            <button id="btn-connect" class="btn-connect">CONNECT</button>
         </div>
-    </div>
+        <div class="header-meta">
+            <div class="meta-item">
+                <span class="meta-label">UPLINK</span>
+                <span class="meta-value" id="ping-display">-- ms</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">ROBOT STATUS</span>
+                <span class="meta-value" id="robot-status-badge">DISCONNECTED</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">UTC</span>
+                <span class="meta-value" id="clock">--:--:--</span>
+            </div>
+        </div>
+    </header>
 
-    <script src="app.js"></script>
+    <!-- MAIN -->
+    <div class="main-container">
+
+        <!-- LEFT: VIDEO + DRIVE -->
+        <section class="video-section">
+            <div class="panel-header">LIVE SENSOR FEED</div>
+            <div class="video-container">
+                <div class="corner-tr"></div><div class="corner-tl"></div>
+                <div class="corner-br"></div><div class="corner-bl"></div>
+                <div class="scan-line"></div>
+                <div class="feed-overlay-info">
+                    <span id="stream-type-tag">STREAM: NONE</span>
+                    <span id="resolution-tag">320×240 @ 10fps</span>
+                </div>
+                <video id="remote-video" autoplay playsinline style="display:none;"></video>
+                <img id="fallback-img" src="" alt="Live Feed" style="display:none;">
+                <div class="feed-placeholder" id="feed-placeholder">
+                    <div class="spinner"></div>
+                    <div class="placeholder-text">AWAITING CONNECTION</div>
+                    <div class="placeholder-sub">Connect to gateway and power on robot</div>
+                </div>
+            </div>
+
+            <!-- Detection toggle -->
+            <div class="teleop-bar">
+                <button id="btn-detection" class="tog-btn" data-on="false">
+                    🔍 DETECTION: OFF
+                </button>
+                <button id="btn-auto" class="tog-btn" data-on="false">
+                    🤖 AUTO: OFF
+                </button>
+            </div>
+
+            <!-- D-pad -->
+            <div class="teleop-container">
+                <div class="dpad">
+                    <div></div>
+                    <button class="btn" id="btn-forward"  data-cmd="forward">▲</button>
+                    <div></div>
+                    <button class="btn" id="btn-left"     data-cmd="left">◀</button>
+                    <button class="btn btn-stop" id="btn-stop" data-cmd="stop">STOP</button>
+                    <button class="btn" id="btn-right"    data-cmd="right">▶</button>
+                    <div></div>
+                    <button class="btn" id="btn-backward" data-cmd="backward">▼</button>
+                    <div></div>
+                </div>
+                <div class="speed-control">
+                    <span class="speed-label">PROPULSION SPEED</span>
+                    <span class="speed-value" id="speed-display">80%</span>
+                    <input type="range" id="speed-slider" min="10" max="100" value="80">
+                </div>
+                <div class="key-hints">
+                    <div class="key-hint"><span class="key">W</span> FWD</div>
+                    <div class="key-hint"><span class="key">S</span> BCK</div>
+                    <div class="key-hint"><span class="key">A</span> LFT</div>
+                    <div class="key-hint"><span class="key">D</span> RGT</div>
+                    <div class="key-hint"><span class="key">SPC</span> STP</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CENTER: LIDAR MAP -->
+        <section class="map-section">
+            <div class="panel-header">LIDAR 2D MAP
+                <span id="map-status-tag" style="margin-left:12px;font-size:9px;color:#ffaa00;"></span>
+            </div>
+            <div class="canvas-container" id="radar-container">
+                <canvas id="radar-canvas"></canvas>
+                <div id="radar-crosshair-h"></div>
+                <div id="radar-crosshair-v"></div>
+            </div>
+            <div class="canvas-footer">
+                <span id="map-hint">Click = target · Shift+Click = waypoint · H = set home</span>
+                <div class="zoom-controls">
+                    <button id="zoom-in"  class="zoom-btn">＋</button>
+                    <button id="zoom-out" class="zoom-btn">－</button>
+                    <span id="zoom-label">Range: 4.0 m</span>
+                </div>
+            </div>
+
+            <!-- Map controls below radar -->
+            <div class="map-controls">
+                <div class="mc-row">
+                    <input type="text" id="map-name" value="map_001" class="mc-input" placeholder="map name">
+                    <button id="btn-save-map"  class="mc-btn">💾 Save Map</button>
+                    <button id="btn-load-map"  class="mc-btn">📂 Load Map</button>
+                    <button id="btn-clear-map" class="mc-btn">🗑 Clear</button>
+                </div>
+                <div class="mc-row">
+                    <input type="text" id="path-name" value="path_001" class="mc-input" placeholder="path name">
+                    <button id="btn-save-path"  class="mc-btn">💾 Save Path</button>
+                    <button id="btn-run-path"   class="mc-btn mc-primary">▶ Run Path</button>
+                    <button id="btn-clear-path" class="mc-btn">🗑 Clear</button>
+                </div>
+                <div class="mc-row">
+                    <button id="btn-set-home" class="mc-btn">📍 Set Home</button>
+                    <button id="btn-go-home"  class="mc-btn">⌂ Go Home</button>
+                    <button id="btn-nav-stop" class="mc-btn mc-danger">■ Stop Nav</button>
+                    <span id="waypoint-count-tag" style="font-size:10px;color:#00aa55;align-self:center;">0 waypoints</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- RIGHT: SIDEBAR -->
+        <aside class="sidebar-section">
+
+            <!-- Battery -->
+            <div class="panel battery-panel">
+                <div class="panel-title">SYSTEM POWER</div>
+                <div class="battery-display">
+                    <div class="battery-icon">
+                        <div class="battery-body">
+                            <div class="battery-fill" id="bat-fill" style="width:0%"></div>
+                        </div>
+                        <div class="battery-tip"></div>
+                    </div>
+                    <div class="battery-pct" id="bat-pct">--%</div>
+                </div>
+            </div>
+
+            <!-- Nav target -->
+            <div class="panel nav-panel">
+                <div class="panel-title">NAV TARGET</div>
+                <div class="target-display" id="target-display">
+                    <span class="target-placeholder">Click radar to set target</span>
+                </div>
+                <div class="coord-inputs">
+                    <div class="input-group">
+                        <label>X (mm)</label>
+                        <input type="number" id="input-x" placeholder="0" step="50">
+                    </div>
+                    <div class="input-group">
+                        <label>Y (mm)</label>
+                        <input type="number" id="input-y" placeholder="0" step="50">
+                    </div>
+                </div>
+                <button id="btn-navigate" class="btn-primary" disabled>SEND NAV COMMAND</button>
+                <button id="btn-clear"    class="btn-secondary">CLEAR TARGET</button>
+            </div>
+
+            <!-- Path status -->
+            <div class="panel">
+                <div class="panel-title">PATH STATUS</div>
+                <div id="path-status-display" style="font-size:11px;min-height:20px;padding:4px 0;">
+                    <span style="color:#005522">Idle</span>
+                </div>
+                <div class="readout-mini">
+                    <span style="color:#00aa55">Steps</span>
+                    <span id="path-steps">—</span>
+                    <span style="color:#00aa55">Waypoints</span>
+                    <span id="waypoint-count">0</span>
+                </div>
+            </div>
+
+            <!-- Detection log -->
+            <div class="panel" id="detection-panel">
+                <div class="panel-title">DETECTION LOG</div>
+                <div id="detection-list" style="font-size:10px;max-height:80px;overflow-y:auto;">
+                    <span style="color:#005522">No detections yet</span>
+                </div>
+            </div>
+
+            <!-- Event log -->
+            <div class="panel logs-panel">
+                <div class="panel-title">TACTICAL EVENT LOG</div>
+                <div class="log-container" id="log-list">
+                    <div class="log-item">
+                        <span class="log-time">[00:00:00]</span>
+                        <span class="log-message system">AWAITING GATEWAY UPLINK...</span>
+                    </div>
+                </div>
+            </div>
+
+        </aside>
+    </div>
+</div>
+<script src="app.js"></script>
 </body>
 </html>
