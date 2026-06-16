@@ -191,6 +191,86 @@
                 </div>
             </div>
 
+            <!-- Servo controls -->
+            <div class="panel">
+                <div class="panel-title">SERVO CONTROLS</div>
+                <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+
+                    <div>
+                        <div style="display:flex;justify-content:space-between;font-size:10px;color:#00aa55;margin-bottom:4px;">
+                            <span>HEAD</span><span id="cloud-head-val">90°</span>
+                        </div>
+                        <input type="range" class="servo-range" id="cloud-head-slider"
+                               min="0" max="180" value="90"
+                               oninput="cloudServoSlide('head', this.value)">
+                        <div style="display:flex;gap:4px;margin-top:3px;">
+                            <button class="mc-btn" onclick="cloudServoSet('head',0)">◀ 0°</button>
+                            <button class="mc-btn" onclick="cloudServoSet('head',90)">CTR</button>
+                            <button class="mc-btn" onclick="cloudServoSet('head',180)">180° ▶</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div style="display:flex;justify-content:space-between;font-size:10px;color:#00aa55;margin-bottom:4px;">
+                            <span>LEFT ARM</span><span id="cloud-left-val">90°</span>
+                        </div>
+                        <input type="range" class="servo-range" id="cloud-left-slider"
+                               min="0" max="180" value="90"
+                               oninput="cloudServoSlide('left_arm', this.value)">
+                        <div style="display:flex;gap:4px;margin-top:3px;">
+                            <button class="mc-btn" onclick="cloudServoSet('left_arm',0)">▼ Down</button>
+                            <button class="mc-btn" onclick="cloudServoSet('left_arm',90)">Mid</button>
+                            <button class="mc-btn" onclick="cloudServoSet('left_arm',180)">▲ Up</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div style="display:flex;justify-content:space-between;font-size:10px;color:#00aa55;margin-bottom:4px;">
+                            <span>RIGHT ARM</span><span id="cloud-right-val">90°</span>
+                        </div>
+                        <input type="range" class="servo-range" id="cloud-right-slider"
+                               min="0" max="180" value="90"
+                               oninput="cloudServoSlide('right_arm', this.value)">
+                        <div style="display:flex;gap:4px;margin-top:3px;">
+                            <button class="mc-btn" onclick="cloudServoSet('right_arm',0)">▼ Down</button>
+                            <button class="mc-btn" onclick="cloudServoSet('right_arm',90)">Mid</button>
+                            <button class="mc-btn" onclick="cloudServoSet('right_arm',180)">▲ Up</button>
+                        </div>
+                    </div>
+
+                    <button class="mc-btn mc-primary" onclick="cloudServoCenter()" style="width:100%;margin-top:2px;">
+                        ⊙ CENTER ALL SERVOS
+                    </button>
+                </div>
+            </div>
+
+            <!-- Path recorder -->
+            <div class="panel">
+                <div class="panel-title">PATH RECORDER</div>
+                <div style="display:flex;gap:6px;margin-bottom:6px;">
+                    <input type="text" id="cloud-rec-name" value="path_001"
+                           class="mc-input" placeholder="path name" style="flex:1;">
+                </div>
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                    <button class="mc-btn" id="cloud-btn-rec-start" onclick="cloudRecStart()"
+                            style="color:var(--amber);border-color:rgba(255,170,0,0.4);">
+                        ⏺ START RECORDING
+                    </button>
+                    <button class="mc-btn" id="cloud-btn-rec-stop" onclick="cloudRecStop()"
+                            style="color:var(--red);border-color:rgba(255,51,51,0.4);">
+                        ⏹ STOP & SAVE
+                    </button>
+                    <button class="mc-btn mc-primary" onclick="cloudRecReplay()">▶ REPLAY PATH</button>
+                    <button class="mc-btn mc-danger"  onclick="cloudRecStopReplay()">■ STOP REPLAY</button>
+                </div>
+                <div id="cloud-rec-status"
+                     style="font-size:10px;color:#005522;margin-top:6px;min-height:14px;">
+                    Ready
+                </div>
+                <div id="cloud-path-list"
+                     style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;"></div>
+            </div>
+
             <!-- Detection log -->
             <div class="panel" id="detection-panel">
                 <div class="panel-title">DETECTION LOG</div>

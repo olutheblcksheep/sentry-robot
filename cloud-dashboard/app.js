@@ -577,6 +577,9 @@
     socket.on("alert",    data => { appendLog("threat", `THREAT: ${data.message}`); flashAlarm(); });
     socket.on("obstacle", data => appendLog("warning", `obstacle ${data.distance}mm at ${data.angle}°`));
 
+    setupServoRecorderEvents(socket);
+    loadCloudPathList();
+
     socket.on("webrtc_signal", async data => {
       const p = data.payload;
       if (p.type === "offer") await startWebRTC(p);
@@ -603,6 +606,111 @@
       feedPlaceholder.style.display = "none";
     });
   });
+
+  // ── Servo Controls ────────────────────────────────────────────────
+  function cloudServoSlide(id, val) {
+    const labels = { head: "cloud-head-val", left_arm: "cloud-left-val", right_arm: "cloud-right-val" };
+    const el = document.getElementById(labels[id]);
+    if (el) el.textContent = val + "°";
+    emit("servo_cmd", { cmd: "servo", id, angle: parseInt(val) });
+  }
+
+  function cloudServoSet(id, angle) {
+    const sliders = { head: "cloud-head-slider", left_arm: "cloud-left-slider", right_arm: "cloud-right-slider" };
+    const labels  = { head: "cloud-head-val",    left_arm: "cloud-left-val",    right_arm: "cloud-right-val" };
+    const slider = document.getElementById(sliders[id]);
+    const label  = document.getElementById(labels[id]);
+    if (slider) slider.value = angle;
+    if (label)  label.textContent = angle + "°";
+    emit("servo_cmd", { cmd: "servo", id, angle });
+  }
+
+  function cloudServoCenter() {
+    ["cloud-head-slider","cloud-left-slider","cloud-right-slider"].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = 90;
+    });
+    ["cloud-head-val","cloud-left-val","cloud-right-val"].forEach(id => {
+      const el = document.getElementById(id); if (el) el.textContent = "90°";
+    });
+    emit("servo_cmd", { cmd: "servo_center" });
+  }
+
+  // ── Path Recorder ─────────────────────────────────────────────────
+  function setCloudRecStatus(msg, color) {
+    const el = document.getElementById("cloud-rec-status");
+    if (el) { el.textContent = msg; el.style.color = color || "#005522"; }
+  }
+
+  function cloudRecStart() {
+    emit("record_start", {});
+    setCloudRecStatus("⏺ RECORDING...", "#ff3333");
+    appendLog("system", "path recording started");
+  }
+
+  function cloudRecStop() {
+    const name = document.getElementById("cloud-rec-name")?.value || "path_001";
+    emit("record_stop", { name });
+    setCloudRecStatus("Saving...", "#ffaa00");
+  }
+
+  function cloudRecReplay() {
+    const name = document.getElementById("cloud-rec-name")?.value || "path_001";
+    emit("record_replay", { name });
+    setCloudRecStatus(`▶ Replaying: ${name}`, "#ffaa00");
+    appendLog("system", `replaying path: ${name}`);
+  }
+
+  function cloudRecStopReplay() {
+    emit("record_replay_stop", {});
+    setCloudRecStatus("Stopped", "#ff3333");
+  }
+
+  function loadCloudPathList() {
+    emit("record_list", {});
+  }
+
+  // ── Socket events for servo + recorder ───────────────────────────
+  function setupServoRecorderEvents(socket) {
+    socket.on("servo_status", d => {
+      if (d.head      !== undefined) {
+        const s = document.getElementById("cloud-head-slider");
+        const l = document.getElementById("cloud-head-val");
+        if (s) s.value = d.head; if (l) l.textContent = d.head + "°";
+      }
+      if (d.left_arm  !== undefined) {
+        const s = document.getElementById("cloud-left-slider");
+        const l = document.getElementById("cloud-left-val");
+        if (s) s.value = d.left_arm; if (l) l.textContent = d.left_arm + "°";
+      }
+      if (d.right_arm !== undefined) {
+        const s = document.getElementById("cloud-right-slider");
+        const l = document.getElementById("cloud-right-val");
+        if (s) s.value = d.right_arm; if (l) l.textContent = d.right_arm + "°";
+      }
+    });
+
+    socket.on("record_status", d => {
+      setCloudRecStatus(d.message, d.recording ? "#ff3333" : "#00ff88");
+      if (!d.recording) appendLog("success", d.message);
+    });
+
+    socket.on("replay_status", d => {
+      const color = d.status === "done" ? "#00ff88" : d.status === "started" ? "#ffaa00" : "#00cc66";
+      setCloudRecStatus(d.message, color);
+      if (d.status !== "running") appendLog(d.status === "done" ? "success" : "system", d.message);
+    });
+
+    socket.on("record_list", d => {
+      const el = document.getElementById("cloud-path-list");
+      if (!el) return;
+      el.innerHTML = (d.paths || []).map(p =>
+        `<span onclick="document.getElementById('cloud-rec-name').value='${p}'"
+          style="cursor:pointer;padding:2px 6px;background:#051408;
+                 border:1px solid #0d3318;border-radius:2px;
+                 font-size:10px;color:#00cc66;">${p}</span>`
+      ).join(" ");
+    });
+  }
 
   // ── Clock ─────────────────────────────────────────────────────────
   setInterval(() => {

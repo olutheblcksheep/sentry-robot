@@ -39,7 +39,8 @@ print(f"[Config] ESP32 → {ESP32_PORT or 'NOT FOUND'}")
 print(f"[Config] LiDAR → {LIDAR_PORT or 'NOT FOUND'}")
 
 # ── Mode ──────────────────────────────────────────────────────────────
-MOCK_MODE       = (ESP32_PORT is None and LIDAR_PORT is None)
+MOCK_MODE = False 
+
 
 # ── Baud rates ────────────────────────────────────────────────────────
 ESP32_BAUD      = 115200
@@ -50,7 +51,7 @@ CAMERA_BACKEND  = "picamera2"
 CAMERA_INDEX    = 0
 CAMERA_WIDTH    = 320
 CAMERA_HEIGHT   = 240
-CAMERA_FPS      = 10
+CAMERA_FPS      = 15
 
 # ── LiDAR ────────────────────────────────────────────────────────────
 LIDAR_ENABLED   = LIDAR_PORT is not None
@@ -80,6 +81,6 @@ MAP_SERVER_PORT = 8000
 # ── Cloud Integration ─────────────────────────────────────────────────
 # Set CLOUD_AGENT_ENABLED = True after you deploy the gateway to Render.
 # Replace the URL with your actual Render service URL.
-CLOUD_AGENT_ENABLED = False   # ← flip to True after Render deployment
-CLOUD_GATEWAY_URL   = "https://YOUR-APP-NAME.onrender.com"   # ← replace this
+CLOUD_AGENT_ENABLED = True   # ← flip to True after Render deployment
+CLOUD_GATEWAY_URL   = "https://sentry-robot.onrender.com" # ← replace this
 

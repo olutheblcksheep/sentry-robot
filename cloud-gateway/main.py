@@ -127,6 +127,32 @@ async def handle_path_clear(sid, data):
 async def handle_nav_stop(sid, data):
     await _to_robot("nav_stop", data, sid)
 
+# Servo commands
+@sio.on("servo_cmd")
+async def handle_servo_cmd(sid, data):
+    await _to_robot("servo_cmd", data, sid)
+
+# Path recorder commands
+@sio.on("record_start")
+async def handle_record_start(sid, data):
+    await _to_robot("record_start", data, sid)
+
+@sio.on("record_stop")
+async def handle_record_stop(sid, data):
+    await _to_robot("record_stop", data, sid)
+
+@sio.on("record_replay")
+async def handle_record_replay(sid, data):
+    await _to_robot("record_replay", data, sid)
+
+@sio.on("record_replay_stop")
+async def handle_record_replay_stop(sid, data):
+    await _to_robot("record_replay_stop", data, sid)
+
+@sio.on("record_list")
+async def handle_record_list(sid, data):
+    await _to_robot("record_list", data, sid)
+
 
 # ── Robot → Operators telemetry ───────────────────────────────────────
 
@@ -189,6 +215,23 @@ async def handle_waypoint_added(sid, data):
 @sio.on("grid_snapshot")
 async def handle_grid_snapshot(sid, data):
     await _to_operators("grid_snapshot", data, sid)
+
+@sio.on("servo_status")
+async def handle_servo_status(sid, data):
+    await _to_operators("servo_status", data, sid)
+
+@sio.on("record_status")
+async def handle_record_status(sid, data):
+    await _to_operators("record_status", data, sid)
+
+@sio.on("replay_status")
+async def handle_replay_status(sid, data):
+    await _to_operators("replay_status", data, sid)
+
+@sio.on("record_list")
+async def handle_record_list_response(sid, data):
+    if sid == robot_sid:
+        await _to_operators("record_list", data, sid)
 
 # WebRTC relay
 @sio.on("webrtc_signal")
