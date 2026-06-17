@@ -176,11 +176,13 @@
     }
 
     // LiDAR scan points
+    // Compass convention (0°=forward/north, clockwise) — must match
+    // pathfinder.py and the IMU heading, not standard math convention.
     lidarPoints.forEach(p => {
       if (!p.distance || p.distance < 150) return;
       const rad = p.angle * Math.PI / 180;
-      const x = cx + Math.cos(rad) * p.distance * scale;
-      const y = cy - Math.sin(rad) * p.distance * scale;
+      const x = cx + Math.sin(rad) * p.distance * scale;
+      const y = cy - Math.cos(rad) * p.distance * scale;
       const close = p.distance < 500;
       ctx.fillStyle   = close ? "#ff3366" : "#00ffaa";
       ctx.shadowColor = close ? "#ff3366" : "#00ffaa";
