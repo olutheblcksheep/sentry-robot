@@ -72,6 +72,13 @@ def lidar_snapshot():
 
 @app.route("/api/status")
 def status():
+    imu_status = {"available": False}
+    try:
+        import imu
+        imu_status = imu.get_status()
+    except ImportError:
+        pass
+
     return jsonify({
         "battery":           round(state.battery_level, 1),
         "detection_enabled": state.detection_enabled,
@@ -83,7 +90,133 @@ def status():
         "lidar_enabled":     config.LIDAR_ENABLED,
         "recording":         _recording,
         "replay_running":    _replay_running,
+        "imu":               imu_status,
     })
+
+
+@app.route("/api/imu")
+def imu_status_route():
+    """Dedicated IMU readout — heading, tilt, raw gyro/accel."""
+    try:
+        import imu
+        return jsonify(imu.get_status())
+    except ImportError:
+        return jsonify({"available": False, "error": "imu.py not installed"})
+
+
+@app.route("/api/imu/recalibrate", methods=["POST"])
+def imu_recalibrate():
+    """Re-run gyro bias calibration. Robot must be stationary."""
+    try:
+        import imu
+        if not imu.imu_available:
+            return jsonify({"ok": False, "message": "IMU not available"}), 400
+        imu.calibrate()
+        return jsonify({"ok": True, "message": "Calibration complete"})
+    except ImportError:
+        return jsonify({"ok": False, "message": "imu.py not installed"}), 404
+
+
+# ═══════════════════════════════════════════════════════════════
+#  GPS / OUTDOOR PATROL ROUTES
+# ═══════════════════════════════════════════════════════════════
+
+@app.route("/api/gps")
+def gps_status_route():
+    """Live GPS readout — fix status, lat/lon, satellites, speed."""
+    try:
+        import gps
+        return jsonify(gps.get_status())
+    except ImportError:
+        return jsonify({"available": False, "error": "gps.py not installed"})
+
+
+@app.route("/api/gps/origin", methods=["POST"])
+def gps_set_origin():
+    """Set the local coordinate origin. Pass lat/lon, or omit to use current fix."""
+    try:
+        import gps
+        d = request.get_json(force=True) if request.data else {}
+        if "lat" in d and "lon" in d:
+            gps.set_origin(float(d["lat"]), float(d["lon"]))
+            return jsonify({"ok": True})
+        ok = gps.set_origin_from_current_fix()
+        return jsonify({"ok": ok})
+    except ImportError:
+        return jsonify({"ok": False, "message": "gps.py not installed"}), 404
+
+
+@app.route("/api/patrol/navigate", methods=["POST"])
+def patrol_navigate_single():
+    """Navigate to a single GPS waypoint (blocking — runs in background thread)."""
+    try:
+        import gps_nav
+        d = request.get_json(force=True)
+        lat = float(d.get("lat"))
+        lon = float(d.get("lon"))
+        import threading
+        threading.Thread(target=gps_nav.navigate_to_waypoint, args=(lat, lon), daemon=True).start()
+        return jsonify({"ok": True, "message": f"Navigating to ({lat}, {lon})"})
+    except ImportError:
+        return jsonify({"ok": False, "message": "gps_nav.py not installed"}), 404
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)}), 400
+
+
+@app.route("/api/patrol/run", methods=["POST"])
+def patrol_run():
+    """Run a saved multi-waypoint outdoor patrol route."""
+    try:
+        import gps_nav
+        d = request.get_json(force=True)
+        name = d.get("name", "patrol_001")
+        ok = gps_nav.run_patrol_route(name)
+        return jsonify({"ok": ok})
+    except ImportError:
+        return jsonify({"ok": False, "message": "gps_nav.py not installed"}), 404
+
+
+@app.route("/api/patrol/stop", methods=["POST"])
+def patrol_stop():
+    try:
+        import gps_nav
+        gps_nav.stop_patrol()
+        return jsonify({"ok": True})
+    except ImportError:
+        return jsonify({"ok": False}), 404
+
+
+@app.route("/api/patrol/record/start", methods=["POST"])
+def patrol_record_start():
+    """Start logging a GPS track — drive the route manually while this runs."""
+    try:
+        import gps_nav
+        gps_nav.start_track_recording()
+        return jsonify({"ok": True})
+    except ImportError:
+        return jsonify({"ok": False, "message": "gps_nav.py not installed"}), 404
+
+
+@app.route("/api/patrol/record/stop", methods=["POST"])
+def patrol_record_stop():
+    """Stop logging and save the GPS track as a named patrol route."""
+    try:
+        import gps_nav
+        d = request.get_json(force=True)
+        name = d.get("name", "patrol_001")
+        result = gps_nav.stop_track_recording(name)
+        return jsonify(result)
+    except ImportError:
+        return jsonify({"ok": False, "message": "gps_nav.py not installed"}), 404
+
+
+@app.route("/api/patrol/list")
+def patrol_list():
+    try:
+        import gps_nav
+        return jsonify({"routes": gps_nav.list_patrol_routes()})
+    except ImportError:
+        return jsonify({"routes": []})
 
 
 @app.route("/api/infer", methods=["POST"])

@@ -494,9 +494,7 @@ socket.on("battery_update", d => updateBattery(d.level));
 socket.on("detection", d => {
   totalDets++;
   document.getElementById("det-count").textContent = `OBJECTS: ${totalDets}`;
-  if (!d.threat) {
-    addLog("detection", `${d.label.toUpperCase()} — ${Math.round(d.confidence*100)}%`);
-  }
+  addLog("detection", `${d.label.toUpperCase()} ? ${Math.round(d.confidence*100)}%`);
   if (d.bbox) drawBox(d.bbox, d.label, d.confidence, d.threat);
 });
 

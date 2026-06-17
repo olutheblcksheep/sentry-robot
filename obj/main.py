@@ -50,6 +50,18 @@ import lidar
 import battery
 import routes                      # noqa: F401  (import registers routes)
 
+try:
+    import imu
+    IMU_AVAILABLE = True
+except ImportError:
+    IMU_AVAILABLE = False
+
+try:
+    import gps
+    GPS_AVAILABLE = True
+except ImportError:
+    GPS_AVAILABLE = False
+
 
 def main():
     # 1. Serial link to the ESP32 motor controller.
@@ -62,6 +74,20 @@ def main():
     camera.camera.start()
     battery.start()
     lidar.start()
+
+    # 3b. Start the IMU — calibrates gyro bias, must run with robot still.
+    imu_started = False
+    if IMU_AVAILABLE:
+        print("[IMU] Starting MPU6050 — keep robot stationary for calibration...")
+        imu_started = imu.start()
+
+    # 3c. Start GPS — for outdoor patrol. Indoors this will simply report
+    #     no fix and the robot falls back to the LiDAR/IMU pathfinder.
+    gps_started = False
+    if GPS_AVAILABLE:
+        gps_started = gps.start()
+        if gps_started:
+            print("[GPS] NEO-6M started — waiting for satellite fix...")
 
     # Start Cloud Integration Agent if enabled
     if config.CLOUD_AGENT_ENABLED:
@@ -80,6 +106,8 @@ def main():
     print(f"  Camera       {config.CAMERA_BACKEND}")
     print(f"  ESP32        {config.ESP32_PORT}")
     print(f"  LiDAR        {config.LIDAR_PORT} (enabled={config.LIDAR_ENABLED})")
+    print(f"  IMU          {'MPU6050 active' if imu_started else 'NOT AVAILABLE'}")
+    print(f"  GPS          {'NEO-6M active (awaiting fix)' if gps_started else 'NOT AVAILABLE'}")
     print(f"  Model        {'loaded' if detection.yolo_model else 'FAILED'}")
     print(f"  Classes      {detection.CLASS_NAMES}")
     print(f"{'='*48}\n")
