@@ -29,7 +29,7 @@ STREAM_HEIGHT = 120
 STREAM_FPS    = 8
 JPEG_QUALITY  = 40
 LIDAR_RATE_HZ = 4
-GRID_INTERVAL = 1.0
+GRID_INTERVAL = 0.2   # 5Hz — fast enough that IMU heading changes feel live on the map
 
 # ── Optional pathfinder ───────────────────────────────────────────────
 try:
@@ -251,6 +251,59 @@ def setup_socket_events(client):
         except Exception as e:
             log.error(f"Record list: {e}")
 
+    # ── GPS / Outdoor Patrol ─────────────────────────────────────────
+    @client.on("gps_set_origin")
+    def on_gps_set_origin(data):
+        try:
+            import requests
+            requests.post("http://localhost:5000/api/gps/origin",
+                          json=data or {}, timeout=2)
+        except Exception as e:
+            log.error(f"GPS origin: {e}")
+
+    @client.on("patrol_record_start")
+    def on_patrol_record_start(data):
+        try:
+            import requests
+            requests.post("http://localhost:5000/api/patrol/record/start", timeout=2)
+        except Exception as e:
+            log.error(f"Patrol record start: {e}")
+
+    @client.on("patrol_record_stop")
+    def on_patrol_record_stop(data):
+        try:
+            import requests
+            requests.post("http://localhost:5000/api/patrol/record/stop",
+                          json=data, timeout=2)
+        except Exception as e:
+            log.error(f"Patrol record stop: {e}")
+
+    @client.on("patrol_run")
+    def on_patrol_run(data):
+        try:
+            import requests
+            requests.post("http://localhost:5000/api/patrol/run",
+                          json=data, timeout=2)
+        except Exception as e:
+            log.error(f"Patrol run: {e}")
+
+    @client.on("patrol_stop")
+    def on_patrol_stop(data):
+        try:
+            import requests
+            requests.post("http://localhost:5000/api/patrol/stop", timeout=2)
+        except Exception as e:
+            log.error(f"Patrol stop: {e}")
+
+    @client.on("patrol_list")
+    def on_patrol_list(data):
+        try:
+            import requests
+            r = requests.get("http://localhost:5000/api/patrol/list", timeout=2)
+            client.emit("patrol_list", r.json())
+        except Exception as e:
+            log.error(f"Patrol list: {e}")
+
     @client.on("webrtc_signal")
     def on_webrtc_signal(data):
         if not WEBRTC_AVAILABLE or not local_loop: return
@@ -308,6 +361,23 @@ def telemetry_loop():
             except Exception as e:
                 log.error(f"Telemetry error: {e}")
         time.sleep(5.0)
+
+
+def gps_push_loop():
+    """Push GPS status to operators every 2 seconds, if gps.py is available."""
+    try:
+        import gps as _gps
+        GPS_OK = True
+    except ImportError:
+        GPS_OK = False
+
+    while is_running:
+        if GPS_OK and sio and sio.connected:
+            try:
+                sio.emit("gps_status", _gps.get_status())
+            except Exception as e:
+                log.error(f"GPS push error: {e}")
+        time.sleep(2.0)
 
 
 def lidar_stream_loop():
@@ -396,6 +466,7 @@ def start(gateway_url: str):
 
     threading.Thread(target=connection_thread, daemon=True).start()
     threading.Thread(target=telemetry_loop,    daemon=True).start()
+    threading.Thread(target=gps_push_loop,     daemon=True).start()
     threading.Thread(target=lidar_stream_loop, daemon=True).start()
     threading.Thread(target=jpeg_stream_loop,  daemon=True).start()
     threading.Thread(target=grid_push_loop,    daemon=True).start()

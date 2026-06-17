@@ -62,6 +62,7 @@
   let detectionEnabled = false, autoEnabled = false;
   let recordedWaypoints = [], activePath = [], homeCell = null;
   let gridData = null, gridOrigin = 200, cellMm = 25, downsample = 2;
+  let robotHeading = 0;   // live IMU heading in degrees, 0 = facing "up" on the map
   let cursorMm = { x_mm: 0, y_mm: 0 };
 
   const webrtcConfig = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
@@ -201,10 +202,33 @@
       ctx.setLineDash([]);
     }
 
-    // Robot dot
+    // Robot — dot plus a heading arrow that rotates with live IMU data
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate((robotHeading * Math.PI) / 180);
+
+    // Body
     ctx.fillStyle = "#ff3c00"; ctx.shadowColor = "#ff3c00"; ctx.shadowBlur = 8;
-    ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0;
+
+    // Heading arrow — points "up" (0°) and rotates with the canvas transform above.
+    // Drawn in canvas space where -y is "up", matching how angle 0 = north elsewhere.
+    ctx.strokeStyle = "#ff3c00";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, -18);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, -18);
+    ctx.lineTo(-4, -12);
+    ctx.lineTo(4, -12);
+    ctx.closePath();
+    ctx.fillStyle = "#ff3c00";
+    ctx.fill();
+
+    ctx.restore();
   }
 
   // ── Target ────────────────────────────────────────────────────────
@@ -529,12 +553,13 @@
     });
 
     socket.on("grid_snapshot", data => {
-      gridData   = data.grid     || null;
-      homeCell   = data.home     || null;
-      activePath = data.path     || [];
-      gridOrigin = data.origin   || 200;
-      cellMm     = data.cell_mm  || 25;
-      downsample = data.downsample || 2;
+      gridData      = data.grid     || null;
+      homeCell      = data.home     || null;
+      activePath    = data.path     || [];
+      gridOrigin    = data.origin   || 200;
+      cellMm        = data.cell_mm  || 25;
+      downsample    = data.downsample || 2;
+      robotHeading  = data.heading  ?? robotHeading;
       pathSteps.textContent = activePath.length;
       renderRadar();
     });
@@ -579,6 +604,7 @@
 
     setupServoRecorderEvents(socket);
     loadCloudPathList();
+    loadCloudPatrolList();
 
     socket.on("webrtc_signal", async data => {
       const p = data.payload;
@@ -669,6 +695,44 @@
     emit("record_list", {});
   }
 
+  // ── GPS / Outdoor Patrol ─────────────────────────────────────────
+  function cloudGpsSetOrigin() {
+    emit("gps_set_origin", {});
+    setCloudPatrolStatus("Setting origin...", "#ffaa00");
+  }
+
+  function cloudPatrolRecStart() {
+    emit("patrol_record_start", {});
+    setCloudPatrolStatus("⏺ Recording GPS track...", "#ff3333");
+  }
+
+  function cloudPatrolRecStop() {
+    const name = document.getElementById("cloud-patrol-name")?.value || "perimeter_001";
+    emit("patrol_record_stop", { name });
+    setCloudPatrolStatus("Saving...", "#ffaa00");
+  }
+
+  function cloudPatrolRun() {
+    const name = document.getElementById("cloud-patrol-name")?.value || "perimeter_001";
+    emit("patrol_run", { name });
+    setCloudPatrolStatus(`▶ Running: ${name}`, "#ffaa00");
+    appendLog("system", `patrol started: ${name}`);
+  }
+
+  function cloudPatrolStop() {
+    emit("patrol_stop", {});
+    setCloudPatrolStatus("Stopped", "#ff3333");
+  }
+
+  function setCloudPatrolStatus(msg, color) {
+    const el = document.getElementById("cloud-patrol-status");
+    if (el) { el.textContent = msg; el.style.color = color || "#005522"; }
+  }
+
+  function loadCloudPatrolList() {
+    emit("patrol_list", {});
+  }
+
   // ── Socket events for servo + recorder ───────────────────────────
   function setupServoRecorderEvents(socket) {
     socket.on("servo_status", d => {
@@ -708,6 +772,55 @@
           style="cursor:pointer;padding:2px 6px;background:#051408;
                  border:1px solid #0d3318;border-radius:2px;
                  font-size:10px;color:#00cc66;">${p}</span>`
+      ).join(" ");
+    });
+
+    // ── GPS status push ──────────────────────────────────────────
+    socket.on("gps_status", d => {
+      const dot  = document.getElementById("cloud-gps-dot");
+      const text = document.getElementById("cloud-gps-text");
+      if (dot && text) {
+        if (d.fix) {
+          dot.style.background = "#00ffaa";
+          dot.style.boxShadow  = "0 0 6px #00ffaa";
+          text.textContent = `Fix — ${d.satellites} sats`;
+        } else {
+          dot.style.background = "#555";
+          dot.style.boxShadow  = "none";
+          text.textContent = d.available ? "No fix" : "GPS not connected";
+        }
+      }
+      const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+      set("cloud-gps-lat",   d.latitude  ? d.latitude.toFixed(6)  : "—");
+      set("cloud-gps-lon",   d.longitude ? d.longitude.toFixed(6) : "—");
+      set("cloud-gps-sats",  d.satellites ?? "—");
+      set("cloud-gps-speed", d.speed_kmh ? d.speed_kmh + " km/h" : "—");
+    });
+
+    // ── Patrol status push ───────────────────────────────────────
+    socket.on("patrol_status", d => {
+      const colors = { started:"#ffaa00", enroute:"#00aaff", navigating:"#ffaa00",
+                       blocked:"#ff3333", error:"#ff3333", complete:"#00ff88",
+                       stopped:"#ff3333", skipped:"#ffaa00", warning:"#ffaa00",
+                       recording:"#ff3333", saved:"#00ff88", timeout:"#ff3333",
+                       detour:"#ff8800" };
+      setCloudPatrolStatus(d.message, colors[d.status] || "#005522");
+      appendLog(d.status === "complete" || d.status === "saved" ? "success" : "system",
+                `[PATROL] ${d.message}`);
+    });
+
+    socket.on("track_point_added", d => {
+      setCloudPatrolStatus(`⏺ Recording — ${d.index} points`, "#ff3333");
+    });
+
+    socket.on("patrol_list", d => {
+      const el = document.getElementById("cloud-patrol-list");
+      if (!el) return;
+      el.innerHTML = (d.routes || []).map(r =>
+        `<span onclick="document.getElementById('cloud-patrol-name').value='${r}'"
+          style="cursor:pointer;padding:2px 6px;background:#021a2a;
+                 border:1px solid #0a3a52;border-radius:2px;
+                 font-size:10px;color:#00aaff;">${r}</span>`
       ).join(" ");
     });
   }
